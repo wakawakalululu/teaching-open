@@ -489,6 +489,11 @@ $ go test ./... -count=1    → 5 个包全部 ok，44 项测试通过
 
 - [ ] 在 JDK 8 环境执行 `PasswordUtil.encrypt("admin","123456","63293188")`，
       确认输出为 `c1461cf4492050e9`（验证 §4.3 的兼容性结论）
+
+      > **进展（2026-11-17）**：Go 侧已通过 `LegacyPBE.Encrypt` 双向验证——
+      > 4 组向量（含 admin/123456/63293188）的加密输出与文档记录的密文**逐字节一致**，
+      > 且 `Encrypt→Decrypt` 往返通过（`internal/passwd/passwd_test.go`）。
+      > 仍建议在真实 JDK 环境跑一次作为交叉确认。
 - [ ] `mvn clean package` 通过，且加固后的 V2.6 能正常登录、注册、找回密码
 - [ ] 用 `sys_user` 全量数据跑一次 `reportLegacyAccounts`，确认存量账号数
 - [ ] 强制全站改密（存量密码可解密，必须视为已泄露）

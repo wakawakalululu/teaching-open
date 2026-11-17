@@ -82,8 +82,20 @@
 |---|---|---|---|
 | **P0** | 密码 rehash 迁移（3 个种子用户先登录触发） | 即时 | 现在 |
 | **P1** | 归档 22 张 onl/demo/test/jeecg 表 | 1 天 | 迁移 P1 业务前 |
-| **P2** | 补 `reportLegacyAccounts` 到 GoFrame 版 | 0.5 天 | 上线前 |
+| ~~P2~~ | ~~补 `reportLegacyAccounts` 到 GoFrame 版~~ | ✅ 已完成 | 2026-11-17 |
 | **P3** | 字符集 utf8mb4 + 注释修正 | 0.5 天 | 有空时 |
+
+## 5.1 已完成的密码迁移能力（2026-11-17）
+
+| 能力 | 实现 | 验证 |
+|---|---|---|
+| 被动迁移 | 登录时校验 legacy 密文成功后 rehash 为 bcrypt | E2E 步骤 2→3 通过 |
+| 主动迁移 | 自助改密 / 管理员重置直接写 bcrypt | E2E 步骤 4 通过 |
+| 迁移进度观测 | 启动日志输出 total/bcrypt/legacy | 实测 `total=3 bcrypt=0 legacy=3` |
+| 算法兼容性 | Go 侧 Encrypt/Decrypt 与 Java 4 组向量逐字节一致 | 单元测试通过 |
+
+> 3 个种子用户只需**各登录一次**（或由管理员重置密码）即可完成迁移。
+> 迁移完成后 `legacy_users=0`，可删除 `passwd.go` 的 Legacy 部分。
 
 ## 6. 环境接入记录（已完成）
 
