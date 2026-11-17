@@ -8,3 +8,20 @@
 
 ## front
 **/*.lock
+
+## go
+*.exe
+*.exe~
+*.test
+*.out
+**/__pycache__/
+*.pyc
+
+## goframe server 本地环境（含凭据，禁止入库）
+goframe-server/manifest/config/config.prod.yaml
+goframe-server/.env
+.env
+
+## AI skills 安装产物（团队各自安装，不入库）
+.agents/
+skills-lock.json
