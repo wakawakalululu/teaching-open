@@ -129,6 +129,88 @@ func (c *Controller) CurrentUser(r *ghttp.Request) {
 	})
 }
 
+// UpdatePassword 用户自助改密（需登录，校验旧密码）。
+//
+// 契约对应前端 components/tools/UserPassword.vue：
+//
+//	PUT /sys/user/updatePassword  {username, oldpassword, password, confirmpassword}
+func (c *Controller) UpdatePassword(r *ghttp.Request) {
+	var req struct {
+		Username        string `json:"username"`
+		OldPassword     string `json:"oldpassword"`
+		Password        string `json:"password"`
+		ConfirmPassword string `json:"confirmpassword"`
+	}
+	if err := r.Parse(&req); err != nil {
+		fail(r, http.StatusBadRequest, "请求参数不合法")
+		return
+	}
+	// 防越权：只允许修改本人密码
+	current := r.GetCtxVar(middleware.CtxKeyUsername).String()
+	if current != "" && req.Username != "" && current != req.Username {
+		fail(r, http.StatusForbidden, "只能修改本人密码")
+		return
+	}
+	if req.Username == "" {
+		req.Username = current
+	}
+	if len(req.Password) > 128 || len(req.OldPassword) > 128 {
+		fail(r, http.StatusBadRequest, "请求参数不合法")
+		return
+	}
+
+	if err := c.svc.ChangePassword(r.Context(), req.Username, req.OldPassword, req.Password, req.ConfirmPassword); err != nil {
+		c.writePasswordError(r, err)
+		return
+	}
+	ok(r, "密码修改成功!")
+}
+
+// ChangePassword 管理员重置他人密码（不校验旧密码，需 admin 角色）。
+//
+// 契约对应前端 views/system/modules/PasswordModal.vue：
+//
+//	PUT /sys/user/changePassword  {username, password, confirmpassword}
+func (c *Controller) ChangePassword(r *ghttp.Request) {
+	var req struct {
+		Username        string `json:"username"`
+		Password        string `json:"password"`
+		ConfirmPassword string `json:"confirmpassword"`
+	}
+	if err := r.Parse(&req); err != nil {
+		fail(r, http.StatusBadRequest, "请求参数不合法")
+		return
+	}
+	if len(req.Password) > 128 {
+		fail(r, http.StatusBadRequest, "请求参数不合法")
+		return
+	}
+	if err := c.svc.ResetPassword(r.Context(), r.GetCtxVar(middleware.CtxKeyUserID).String(), req.Username, req.Password, req.ConfirmPassword); err != nil {
+		c.writePasswordError(r, err)
+		return
+	}
+	ok(r, "密码重置成功!")
+}
+
+// writePasswordError 将改密错误映射为统一响应。
+func (c *Controller) writePasswordError(r *ghttp.Request, err error) {
+	switch {
+	case errors.Is(err, login.ErrForbidden):
+		fail(r, http.StatusForbidden, err.Error())
+	case errors.Is(err, login.ErrUserNotFound):
+		fail(r, http.StatusNotFound, err.Error())
+	case errors.Is(err, login.ErrOldPasswordWrong):
+		fail(r, http.StatusBadRequest, err.Error())
+	case errors.Is(err, login.ErrEmptyNewPassword),
+		errors.Is(err, login.ErrConfirmMismatch),
+		errors.Is(err, login.ErrWeakPassword):
+		fail(r, http.StatusBadRequest, err.Error())
+	default:
+		g.Log().Errorf(r.Context(), "改密处理异常 err=%s", err.Error())
+		fail(r, http.StatusInternalServerError, "操作失败，请稍后重试")
+	}
+}
+
 // publicUser 组装对外用户信息（白名单 DTO，新增字段默认不输出）。
 func publicUser(u *entity.SysUser, roles []string) g.Map {
 	if u == nil {

@@ -66,10 +66,16 @@ go run .
 |---|---|---|
 | `JWT_SECRET` | JWT HMAC 密钥（≥32 字节，必填） | 无（缺省拒绝启动） |
 | `JWT_PREV_SECRET` | 密钥轮换期旧密钥（只验不签） | 空 |
-| `MYSQL_DSN` | MySQL 连接串 | 见 config.yaml |
-| `REDIS_ADDR` | Redis 地址 | 127.0.0.1:6379 |
+| `MYSQL_LINK` | MySQL 连接串（`mysql:user:pass@tcp(host:port)/db?...`） | 见 config.yaml |
+| `REDIS_ENABLED` | 是否启用 Redis（限流 + 令牌吊销）；关闭时两者 fail-open | false |
+| `REDIS_ADDR` | Redis 地址（见 config.yaml `redis.default.address`） | 127.0.0.1:6379 |
 | `CORS_ALLOWED_ORIGINS` | 跨域白名单（逗号分隔，禁止 `*`） | 空 |
+| `FEISHU_WEBHOOK_URL` | 飞书机器人告警地址（账号锁定/DB 故障推送） | 空（禁用） |
 | `APP_ENV` | 运行环境标识 | production |
+
+> **Redis 开关说明**：`REDIS_ENABLED=false` 时，登录限流与令牌吊销自动降级为
+> fail-open（可用性优先，日志告警）。**生产环境必须设为 `true`**，否则登出/改密
+> 无法真正吊销已签发令牌。
 
 ## 接口契约（与前端零改动对接）
 
@@ -88,17 +94,33 @@ go run .
 | POST | `/api/sys/refreshToken` | 刷新令牌换新 | 否 |
 | GET | `/api/sys/user/info` | 当前用户信息 | 是 |
 | POST | `/api/sys/logout` | 登出（吊销令牌） | 是 |
+| PUT | `/api/sys/user/updatePassword` | 自助改密（校验旧密码，仅本人） | 是 |
+| PUT | `/api/sys/user/changePassword` | 管理员重置他人密码（需 admin 角色） | 是 |
+
+### 运维工具（`tools/`）
+
+| 工具 | 用途 |
+|---|---|
+| `probe` | 探测数据库连接、列出表 |
+| `importer` | 导入 `teachingopen2.6.sql`（自动关闭外键检查） |
+| `verifyseed` | 统计密码方案分布（bcrypt / legacy） |
+| `e2e` | 端到端验证登录 → rehash → 改密 → 越权拦截 |
 
 ## 安全要点
 
 1. **默认拒绝鉴权**：所有写操作路由必须显式声明认证，否则启动自检 `panic`。
 2. **占位符绑定防注入**：全部 gdb 占位符，表名/列名为常量。
-3. **密码迁移**：存量 V2.6 PBE 密文登录成功后自动 rehash 为 bcrypt（cost=12）。
+3. **密码迁移双路径**：
+   - 被动：存量 PBE 密文登录成功后自动 rehash 为 bcrypt（cost=12）；
+   - 主动：任何改密/重置动作直接写 bcrypt（salt 清空），并推送飞书告警。
 4. **双令牌 + 吊销**：Access 2h / Refresh 7d，刷新令牌一次性使用。
 5. **登录限流**：用户名 + IP 维度，5 次 / 15 分钟，Lua 原子计数。
+6. **越权防护**：自助改密只允许本人；管理员重置显式校验 admin 角色
+   （Java 版该注解被注释掉，此处补齐）。
 
-## 待办（与旧 go-server 相同的诚实边界）
+## 待办
 
-- 未实现全部 495 个业务端点（当前为可运行的安全骨架 + 登录链路）。
-- 密码兼容向量仍需在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 做最终确认。
+- 未实现全部 495 个业务端点（当前为可运行的安全骨架 + 登录/改密链路）。
+- 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
+  仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
 - 文件存储、对象存储、Quartz 调度、在线表单等模块未实现。

@@ -51,6 +51,9 @@ type SecurityConfig struct {
 	MaxUploadBytes int64
 	// FeishuWebhook 飞书机器人告警地址（为空则禁用告警）。
 	FeishuWebhook string
+	// RedisEnabled 是否启用 Redis（限流 + 令牌吊销）。
+	// 关闭时这两项能力自动降级：限流 fail-open、吊销 fail-open。
+	RedisEnabled bool
 }
 
 // StorageConfig 对象存储参数。
@@ -100,6 +103,9 @@ func Load() (*Config, error) {
 	cfg.Security.LoginFailWindow = 15 * time.Minute
 	cfg.Security.MaxUploadBytes = 100 << 20 // 100MB
 	cfg.Security.FeishuWebhook = env("FEISHU_WEBHOOK_URL", "")
+	// 默认关闭 Redis：无 Redis 时登录限流与令牌吊销走 fail-open 降级，
+	// 避免开发/演示环境受保护接口全部 401。生产环境应显式设置 REDIS_ENABLED=true。
+	cfg.Security.RedisEnabled = env("REDIS_ENABLED", "false") == "true"
 
 	cfg.Storage.Driver = env("STORAGE_DRIVER", "local")
 	cfg.Storage.LocalRoot = env("STORAGE_LOCAL_ROOT", "./data/upload")

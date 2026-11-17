@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"time"
 
+	glog "github.com/gogf/gf/v2/os/glog"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
@@ -57,21 +58,36 @@ type Manager struct {
 	accessTTL  time.Duration
 	refreshTTL time.Duration
 	revoker    Revoker
+	// revokerFailOpen 吊销存储不可用时是否放行令牌。
+	// 生产环境应保持 false（fail-closed）；无 Redis 的开发/演示环境设为 true。
+	revokerFailOpen bool
+}
+
+// Option 构造选项。
+type Option func(*Manager)
+
+// WithRevokerFailOpen 设置吊销存储故障时的放行策略。
+func WithRevokerFailOpen(open bool) Option {
+	return func(m *Manager) { m.revokerFailOpen = open }
 }
 
 // NewManager 构造令牌管理器。
-func NewManager(cfg config.JWTConfig, revoker Revoker) (*Manager, error) {
+func NewManager(cfg config.JWTConfig, revoker Revoker, opts ...Option) (*Manager, error) {
 	if len(cfg.Secret) < 32 {
 		return nil, errors.New("JWT 密钥长度不足 32 字节")
 	}
-	return &Manager{
+	m := &Manager{
 		secret:     []byte(cfg.Secret),
 		prevSecret: []byte(cfg.PrevSecret),
 		issuer:     cfg.Issuer,
 		accessTTL:  cfg.AccessTTL,
 		refreshTTL: cfg.RefreshTTL,
 		revoker:    revoker,
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m, nil
 }
 
 // TokenPair 是一次登录签发的令牌对。
@@ -164,10 +180,15 @@ func (m *Manager) Parse(ctx context.Context, raw, expectedType string) (*Claims,
 	if m.revoker != nil {
 		revoked, revokeErr := m.revoker.IsRevoked(ctx, claims.ID)
 		if revokeErr != nil {
-			// 吊销状态不可判定时按已吊销处理（fail-closed）
-			return nil, fmt.Errorf("%w: 无法确认吊销状态", ErrInvalidToken)
-		}
-		if revoked {
+			// 吊销存储不可用时的策略由 Manager 配置决定：
+			//   - fail-closed（默认，生产推荐）：拒绝令牌，避免故障期放行已注销令牌；
+			//   - fail-open（无 Redis 的开发/演示环境）：放行，否则受保护接口全部 401。
+			if m.revokerFailOpen {
+				glog.Warningf(ctx, "吊销状态查询失败，按未吊销处理（fail-open）: %s", revokeErr.Error())
+			} else {
+				return nil, fmt.Errorf("%w: 无法确认吊销状态", ErrInvalidToken)
+			}
+		} else if revoked {
 			return nil, ErrTokenRevoked
 		}
 	}

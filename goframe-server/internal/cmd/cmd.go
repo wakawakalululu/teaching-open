@@ -65,8 +65,19 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	}
 
 	// 2. 令牌、限流、业务服务装配
-	revoker := svcLogin.NewRedisRevoker()
-	tokens, err := auth.NewManager(cfg.JWT, revoker)
+	var (
+		revoker   auth.Revoker
+		tokenOpts []auth.Option
+	)
+	if cfg.Security.RedisEnabled {
+		revoker = svcLogin.NewRedisRevoker()
+		g.Log().Info(ctx, "Redis 已启用：登录限流与令牌吊销生效")
+	} else {
+		// 无 Redis：吊销不可用，令牌校验 fail-open，保证受保护接口可用
+		tokenOpts = append(tokenOpts, auth.WithRevokerFailOpen(true))
+		g.Log().Warning(ctx, "Redis 未启用：登录限流与令牌吊销降级为 fail-open（仅适用于开发/演示）")
+	}
+	tokens, err := auth.NewManager(cfg.JWT, revoker, tokenOpts...)
 	if err != nil {
 		return err
 	}
@@ -117,6 +128,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.Middleware(middleware.RequireAuth(tokens))
 		group.GET("/sys/user/info", loginCtrl.CurrentUser)
 		group.POST("/sys/logout", loginCtrl.Logout)
+		// 密码管理：自助改密（校验旧密码）与管理员重置（服务层校验 admin 角色）
+		group.PUT("/sys/user/updatePassword", loginCtrl.UpdatePassword)
+		group.PUT("/sys/user/changePassword", loginCtrl.ChangePassword)
 	})
 
 	verifyRouteGuards()
@@ -143,6 +157,8 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/refreshToken", false)
 	// 受保护写路由
 	registerGuard("POST", "/api/sys/logout", true)
+	registerGuard("PUT", "/api/sys/user/updatePassword", true)
+	registerGuard("PUT", "/api/sys/user/changePassword", true)
 
 	for _, rt := range guardedRoutes {
 		if !isMutating(rt.method) {

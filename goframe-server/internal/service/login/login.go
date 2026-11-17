@@ -100,7 +100,7 @@ func (s *Service) Login(ctx context.Context, username, password, clientIP string
 		g.Log().Warning(ctx, "清除登录失败计数失败", err.Error())
 	}
 
-	roles, err := s.listRoles(ctx, user.Id)
+	roles, err := s.ListRoles(ctx, user.Id)
 	if err != nil {
 		g.Log().Warningf(ctx, "查询用户角色失败，按无角色处理 user_id=%s err=%s", user.Id, err.Error())
 		roles = nil
@@ -170,7 +170,7 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*LoginResul
 	if revokeErr := s.tokens.Revoke(ctx, refreshToken); revokeErr != nil {
 		g.Log().Warning(ctx, "吊销旧刷新令牌失败", revokeErr.Error())
 	}
-	roles, _ := s.listRoles(ctx, user.Id)
+	roles, _ := s.ListRoles(ctx, user.Id)
 	tokens, err := s.tokens.Issue(user.Id, user.Username)
 	if err != nil {
 		return nil, fmt.Errorf("签发令牌失败: %w", err)
@@ -215,7 +215,11 @@ func (s *Service) getByID(ctx context.Context, id string) (*entity.SysUser, erro
 	return user, nil
 }
 
-func (s *Service) listRoles(ctx context.Context, userID string) ([]string, error) {
+// ListRoles 查询用户的角色编码。
+//
+// 注意：sys_role 表没有 del_flag 字段（已核对 teachingopen2.6.sql 结构），
+// 不能加 r.del_flag 过滤，否则会因未知列直接 SQL 报错。
+func (s *Service) ListRoles(ctx context.Context, userID string) ([]string, error) {
 	var (
 		codes []string
 		err   error
@@ -224,7 +228,6 @@ func (s *Service) listRoles(ctx context.Context, userID string) ([]string, error
 		InnerJoin("sys_role r", "r.id = ur.role_id").
 		Fields("r.role_code").
 		Where("ur.user_id", userID).
-		Where("r.del_flag", 0).
 		Ctx(ctx).
 		Scan(&codes)
 	if err != nil {

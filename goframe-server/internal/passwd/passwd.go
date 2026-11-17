@@ -158,6 +158,25 @@ func (p *LegacyPBE) Decrypt(ciphertextHex, password, salt string) (string, error
 	return string(plain), nil
 }
 
+// Encrypt 用「用户输入密码」加密明文，产出与 Java 版 PasswordUtil 一致的密文。
+//
+// 仅用于：生成与存量格式兼容的测试数据、迁移期回归验证。
+// 业务侧写密码一律用 Hash（bcrypt），绝不使用本方法。
+func (p *LegacyPBE) Encrypt(plaintext, password, salt string) (string, error) {
+	key, iv, err := p.keyAndIV(password, salt)
+	if err != nil {
+		return "", err
+	}
+	block, err := des.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("DES 初始化失败: %w", err)
+	}
+	padded := pkcs5Pad([]byte(plaintext), des.BlockSize)
+	out := make([]byte, len(padded))
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(out, padded)
+	return hex.EncodeToString(out), nil
+}
+
 // Verify 校验「用户名 + 输入密码 + 盐」是否与存量密文匹配。
 func (p *LegacyPBE) Verify(username, plainPassword, storedCipher, salt string) error {
 	if storedCipher == "" {
@@ -189,6 +208,12 @@ func pkcs5Unpad(data []byte, blockSize int) ([]byte, error) {
 		return nil, errors.New("填充非法")
 	}
 	return data[:len(data)-pad], nil
+}
+
+// pkcs5Pad 按 PKCS#5 填充（与 Java Cipher 的 PKCS5Padding 一致）。
+func pkcs5Pad(data []byte, blockSize int) []byte {
+	pad := blockSize - len(data)%blockSize
+	return append(data, bytes.Repeat([]byte{byte(pad)}, pad)...)
 }
 
 // ---------- 通用工具 ----------
