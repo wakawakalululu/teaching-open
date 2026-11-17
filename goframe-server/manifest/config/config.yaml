@@ -1,0 +1,31 @@
+# teaching-open GoFrame 版服务端配置
+# 密钥（JWT）必须通过环境变量 JWT_SECRET 注入，不落本文件。
+
+# HTTP Server
+server:
+  address: ":8080"
+  dumpRouterMap: false
+  routeOverWrite: true
+  accessLogEnabled: true
+  # 生产环境不开启 openapi/swagger
+  openapiPath: ""
+  swaggerPath: ""
+
+# 全局日志
+logger:
+  level: "info"
+  stdout: true
+
+# 数据库（优先读环境变量 MYSQL_LINK，在 cmd.go 中覆盖；此处为本地兜底）
+database:
+  logger:
+    level: "all"
+    stdout: true
+  default:
+    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/teachingopen?parseTime=true&loc=UTC"
+    debug: false
+
+# Redis（可选，未配置时登录限流/令牌吊销自动降级为 fail-open）
+redis:
+  default:
+    address: "127.0.0.1:6379"
