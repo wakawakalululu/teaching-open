@@ -83,6 +83,18 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	}
 	g.Log().Infof(ctx, "数据库连接正常")
 
+	// 2.2 存量密码迁移进度统计（只读，用于评估 weakest-link 规模）
+	if total, bcryptCount, statErr := reportLegacyAccounts(ctx); statErr != nil {
+		g.Log().Warningf(ctx, "存量密码统计失败: %s", statErr.Error())
+	} else {
+		legacy := total - bcryptCount
+		g.Log().Infof(ctx, "密码散列迁移进度 total_users=%d bcrypt_users=%d legacy_users=%d",
+			total, bcryptCount, legacy)
+		if legacy > 0 {
+			g.Log().Warningf(ctx, "仍有 %d 个账号使用可逆 DES 密文，需触发登录完成 rehash 迁移", legacy)
+		}
+	}
+
 	// 3. HTTP 服务与路由
 	s := g.Server()
 	s.Use(middleware.Recover)
@@ -156,6 +168,32 @@ func isMutating(method string) bool {
 	default:
 		return false
 	}
+}
+
+// reportLegacyAccounts 统计仍使用 Java 版 PBE 密文的账号数量，用于评估迁移进度。
+//
+// 该查询只读，表名/列名为代码内常量；BCRYPT 判定与 passwd.Detect 保持一致
+// （$2a$/$2b$/$2y$ 前缀），避免两处逻辑漂移。
+func reportLegacyAccounts(ctx context.Context) (total, bcryptCount int, err error) {
+	const query = `SELECT
+			COUNT(*) AS total,
+			SUM(CASE
+				WHEN password LIKE '$2a$%' OR password LIKE '$2b$%' OR password LIKE '$2y$%'
+				THEN 1 ELSE 0 END) AS bcrypt_count
+		FROM sys_user
+		WHERE del_flag = 0`
+
+	one, err := g.DB().GetOne(ctx, query)
+	if err != nil {
+		return 0, 0, err
+	}
+	if one.IsEmpty() {
+		return 0, 0, nil
+	}
+	total = one["total"].Int()
+	bcryptCount = one["bcrypt_count"].Int()
+	// SUM 在空表时返回 NULL，Int() 会得到 0，语义正确
+	return total, bcryptCount, nil
 }
 
 func gctxCtx() context.Context {
