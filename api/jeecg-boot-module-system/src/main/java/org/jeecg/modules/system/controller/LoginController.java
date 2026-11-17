@@ -62,6 +62,74 @@ public class LoginController {
 //	private static final String BASE_CHECK_CODES = "qwertyuiplkjhgfdsazxcvbnmQWERTYUPLKJHGFDSAZXCVBNM1234567890";
 	private static final String BASE_CHECK_CODES = "1234567890";
 
+	// ===== 安全加固(V2.6)：登录失败限制参数 =====
+	/** 允许的最大连续失败次数 */
+	private static final long MAX_LOGIN_FAIL_COUNT = 5L;
+	/** 失败计数的锁定时长（秒），15 分钟 */
+	private static final long LOGIN_FAIL_LOCK_SECONDS = 15 * 60L;
+	/** 失败计数在 Redis 中的 key 前缀 */
+	private static final String LOGIN_FAIL_KEY_PREFIX = "login:fail:";
+
+	/**
+	 * 构造登录失败计数用的 Redis key。
+	 * <p>维度为 用户名 + 客户端 IP：既防止针对单一账号的爆破，也避免同一出口
+	 * NAT 下的正常用户被无关账号的失败次数连带锁定。
+	 */
+	private String buildLoginFailKey(String username, HttpServletRequest request) {
+		String ip = "unknown";
+		try {
+			ip = oConvertUtils.getIpAddrByRequest(request);
+		} catch (Exception e) {
+			log.debug("获取客户端IP失败，降级为 unknown", e);
+		}
+		String raw = (username == null ? "" : username.trim().toLowerCase()) + "|" + ip;
+		return LOGIN_FAIL_KEY_PREFIX + MD5Util.MD5Encode(raw, "utf-8");
+	}
+
+	/**
+	 * 读取当前失败次数，不存在时返回 null。
+	 */
+	private Long getLoginFailCount(String key) {
+		try {
+			Object value = redisUtil.get(key);
+			if (value == null) {
+				return null;
+			}
+			if (value instanceof Number) {
+				return ((Number) value).longValue();
+			}
+			return Long.parseLong(String.valueOf(value));
+		} catch (Exception e) {
+			// Redis 异常时不阻断登录，仅记录日志（可用性优先，限流为兜底能力）
+			log.warn("读取登录失败计数失败: key={}", key, e);
+			return null;
+		}
+	}
+
+	/**
+	 * 记录一次登录失败，并刷新锁定窗口。
+	 */
+	private void recordLoginFail(String key) {
+		try {
+			long count = redisUtil.incr(key, 1L);
+			redisUtil.expire(key, LOGIN_FAIL_LOCK_SECONDS);
+			log.info("登录失败计数: key={}, count={}", key, count);
+		} catch (Exception e) {
+			log.warn("记录登录失败计数失败: key={}", key, e);
+		}
+	}
+
+	/**
+	 * 登录成功后清除失败计数。
+	 */
+	private void clearLoginFail(String key) {
+		try {
+			redisUtil.del(key);
+		} catch (Exception e) {
+			log.warn("清除登录失败计数失败: key={}", key, e);
+		}
+	}
+
 	@ApiOperation("注册或登录用户")
 	@GetMapping("ssoLogin")
 	public Result<?> ssoLogin(@RequestParam String thirdToken){
@@ -73,7 +141,7 @@ public class LoginController {
 
 	@ApiOperation("登录接口")
 	@RequestMapping(value = "/login", method = RequestMethod.POST)
-	public Result<JSONObject> login(@RequestBody SysLoginModel sysLoginModel){
+	public Result<JSONObject> login(@RequestBody SysLoginModel sysLoginModel, HttpServletRequest request){
 		Result<JSONObject> result = new Result<JSONObject>();
 		String username = sysLoginModel.getUsername();
 		String password = sysLoginModel.getPassword();
@@ -97,6 +165,17 @@ public class LoginController {
 		}
 		//update-end-author:taoyan date:20190828 for:校验验证码
 		
+		// ===== 安全加固(V2.6)：登录失败次数限制，抑制在线暴力破解 =====
+		// 以 用户名 + 客户端IP 作为计数维度，连续 5 次失败后锁定 15 分钟。
+		// 应用层兜底，生产环境仍建议在网关层叠加 IP 级限流。
+		String loginFailKey = buildLoginFailKey(username, request);
+		Long failCount = getLoginFailCount(loginFailKey);
+		if (failCount != null && failCount >= MAX_LOGIN_FAIL_COUNT) {
+			log.warn("登录失败次数超限，已临时锁定: username={}, ip={}", username, oConvertUtils.getIpAddrByRequest(request));
+			result.error500("密码错误次数过多，账号已临时锁定，请 15 分钟后再试");
+			return result;
+		}
+		
 		//1. 校验用户是否有效
 		SysUser sysUser = sysUserService.getUserByName(username);
 		result = sysUserService.checkUserIsEffective(sysUser);
@@ -108,9 +187,12 @@ public class LoginController {
 		String userpassword = PasswordUtil.encrypt(username, password, sysUser.getSalt());
 		String syspassword = sysUser.getPassword();
 		if (!syspassword.equals(userpassword)) {
+			recordLoginFail(loginFailKey);
 			result.error500("用户名或密码错误");
 			return result;
 		}
+		// 登录成功，清除失败计数
+		clearLoginFail(loginFailKey);
 				
 		//用户登录信息
 		userInfo(sysUser, result);
@@ -439,11 +521,21 @@ public class LoginController {
 	 * @throws Exception
 	 */
 	@RequestMapping(value = "/mLogin", method = RequestMethod.POST)
-	public Result<JSONObject> mLogin(@RequestBody SysLoginModel sysLoginModel) throws Exception {
+	public Result<JSONObject> mLogin(@RequestBody SysLoginModel sysLoginModel, HttpServletRequest request) throws Exception {
 		Result<JSONObject> result = new Result<JSONObject>();
 		String username = sysLoginModel.getUsername();
 		String password = sysLoginModel.getPassword();
-		
+
+		// ===== 安全加固(V2.6)：App 登录同样接入失败次数限制 =====
+		// mLogin 不校验图形验证码，是比 /login 更直接的爆破入口，必须同样限流。
+		String loginFailKey = buildLoginFailKey(username, request);
+		Long failCount = getLoginFailCount(loginFailKey);
+		if (failCount != null && failCount >= MAX_LOGIN_FAIL_COUNT) {
+			log.warn("App登录失败次数超限，已临时锁定: username={}, ip={}", username, oConvertUtils.getIpAddrByRequest(request));
+			result.error500("密码错误次数过多，账号已临时锁定，请 15 分钟后再试");
+			return result;
+		}
+
 		//1. 校验用户是否有效
 		SysUser sysUser = sysUserService.getUserByName(username);
 		result = sysUserService.checkUserIsEffective(sysUser);
@@ -455,10 +547,12 @@ public class LoginController {
 		String userpassword = PasswordUtil.encrypt(username, password, sysUser.getSalt());
 		String syspassword = sysUser.getPassword();
 		if (!syspassword.equals(userpassword)) {
+			recordLoginFail(loginFailKey);
 			result.error500("用户名或密码错误");
 			return result;
 		}
-		
+		clearLoginFail(loginFailKey);
+
 		String orgCode = sysUser.getOrgCode();
 		if(oConvertUtils.isEmpty(orgCode)) {
 			//如果当前用户无选择部门 查看部门关联信息

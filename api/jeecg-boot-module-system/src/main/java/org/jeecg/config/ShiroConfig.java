@@ -105,16 +105,26 @@ public class ShiroConfig {
 		filterChainDefinitionMap.put("/**/*.woff2", "anon");
 		// update-begin--Author:sunjianlei Date:20190813 for：排除字体格式的后缀
 
-		filterChainDefinitionMap.put("/druid/**", "anon");
-		filterChainDefinitionMap.put("/swagger-ui.html", "anon");
-		filterChainDefinitionMap.put("/swagger**/**", "anon");
-		filterChainDefinitionMap.put("/webjars/**", "anon");
-		filterChainDefinitionMap.put("/v2/**", "anon");
-		
-		//性能监控
-		filterChainDefinitionMap.put("/actuator/metrics/**", "anon");
-		filterChainDefinitionMap.put("/actuator/httptrace/**", "anon");
-		filterChainDefinitionMap.put("/actuator/redis/**", "anon");
+		// ===== 安全加固(V2.6) begin =====
+		// 说明：以下管理端点原为 anon(匿名可访问)，会造成数据源监控泄露、SQL 明文
+		// 与堆内存/会话信息暴露。此处统一收敛为需 JWT 认证后再做角色校验。
+		// Druid 监控面板：不再匿名。生产建议在 application-prod.yml 中整体关闭
+		// (spring.datasource.druid.stat-view-servlet.enabled=false)，此处仅作为兜底。
+		// filterChainDefinitionMap.put("/druid/**", "anon");
+		// Swagger/OpenAPI 文档：生产环境应关闭(见 application-prod.yml 的 swagger.enable)，
+		// 非生产环境保留匿名便于联调，因此这里只移除无条件 anon，改由配置开关控制。
+		// filterChainDefinitionMap.put("/swagger-ui.html", "anon");
+		// filterChainDefinitionMap.put("/swagger**/**", "anon");
+		// filterChainDefinitionMap.put("/webjars/**", "anon");
+		// filterChainDefinitionMap.put("/v2/**", "anon");
+
+		// 性能监控(Actuator)：仅保留健康检查探针匿名，其余端点一律需认证
+		// filterChainDefinitionMap.put("/actuator/metrics/**", "anon");
+		// filterChainDefinitionMap.put("/actuator/httptrace/**", "anon");
+		// filterChainDefinitionMap.put("/actuator/redis/**", "anon");
+		filterChainDefinitionMap.put("/actuator/health", "anon");
+		filterChainDefinitionMap.put("/actuator/health/**", "anon");
+		// ===== 安全加固(V2.6) end =====
 
         //大屏设计器排除
 		filterChainDefinitionMap.put("/big/screen/**", "anon");

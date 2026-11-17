@@ -275,7 +275,9 @@ public class SysDepartPermissionController extends JeecgController<SysDepartPerm
 			 LambdaQueryWrapper<SysPermission> query = new LambdaQueryWrapper<SysPermission>();
 			 query.eq(SysPermission::getDelFlag, CommonConstant.DEL_FLAG_0);
 			 query.orderByAsc(SysPermission::getSortNo);
-			 query.inSql(SysPermission::getId,"select permission_id  from sys_depart_permission where depart_id='"+departId+"'");
+			 // 安全加固(V2.6)：原实现将 departId 直接拼接进 inSql 子查询，存在 SQL 注入。
+			 // 改为 apply 的 {0} 占位符，由 MyBatis 预编译绑定。
+			 query.apply("id IN (SELECT permission_id FROM sys_depart_permission WHERE depart_id = {0})", departId);
 			 List<SysPermission> list = sysPermissionService.list(query);
 			 for(SysPermission sysPer : list) {
 				 ids.add(sysPer.getId());

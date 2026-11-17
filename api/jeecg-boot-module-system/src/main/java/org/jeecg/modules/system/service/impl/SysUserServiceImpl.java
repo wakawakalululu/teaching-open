@@ -13,6 +13,7 @@ import org.jeecg.common.system.api.ISysBaseAPI;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.common.system.vo.SysUserCacheInfo;
 import org.jeecg.common.util.PasswordUtil;
+import org.jeecg.common.util.SqlIdentifierUtil;
 import org.jeecg.common.util.UUIDGenerator;
 import org.jeecg.common.util.oConvertUtils;
 import org.jeecg.modules.system.entity.*;
@@ -253,7 +254,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 		LambdaQueryWrapper<SysUser> lambdaQueryWrapper = queryWrapper.lambda();
 
 		lambdaQueryWrapper.eq(SysUser::getDelFlag, "0");
-        lambdaQueryWrapper.inSql(SysUser::getId, "SELECT user_id FROM sys_user_depart WHERE dep_id = '" + departId + "'");
+		// 安全加固(V2.6)：原实现把 departId 直接拼进 inSql 子查询字符串，存在 SQL 注入。
+		// 改用 apply 的 {0} 占位符，由 MyBatis 预编译绑定参数。
+		lambdaQueryWrapper.apply("id IN (SELECT user_id FROM sys_user_depart WHERE dep_id = {0})", departId);
 
         return userMapper.selectPage(page, lambdaQueryWrapper);
 	}
@@ -389,16 +392,23 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
 	@Override
 	public boolean revertLogicDeleted(List<String> userIds, SysUser updateEntity) {
-		String ids = String.format("'%s'", String.join("','", userIds));
-		return userMapper.revertLogicDeleted(ids, updateEntity) > 0;
+		// 安全加固(V2.6)：不再手工拼接单引号串，直接交由 MyBatis foreach 预编译绑定。
+		// 空集合会让 foreach 生成 "id IN ()" 造成 SQL 语法错误，这里直接短路返回。
+		if (userIds == null || userIds.isEmpty()) {
+			return false;
+		}
+		return userMapper.revertLogicDeleted(userIds, updateEntity) > 0;
 	}
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
 	public boolean removeLogicDeleted(List<String> userIds) {
-		String ids = String.format("'%s'", String.join("','", userIds));
+		// 安全加固(V2.6)：不再手工拼接单引号串，直接交由 MyBatis foreach 预编译绑定。
+		if (userIds == null || userIds.isEmpty()) {
+			return false;
+		}
 		// 1. 删除用户
-		int line = userMapper.deleteLogicDeleted(ids);
+		int line = userMapper.deleteLogicDeleted(userIds);
 		// 2. 删除用户部门关系
 		line += sysUserDepartMapper.delete(new LambdaQueryWrapper<SysUserDepart>().in(SysUserDepart::getUserId, userIds));
 		//3. 删除用户角色关系
@@ -419,8 +429,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean updateNullPhoneEmail() {
-        userMapper.updateNullByEmptyString("email");
-        userMapper.updateNullByEmptyString("phone");
+        // 安全加固(V2.6)：updateNullByEmptyString 的字段名以 ${fieldName} 拼入 SQL，
+        // 仅允许白名单内的列，避免该方法被复用时成为注入入口。
+        for (String column : new String[]{"email", "phone"}) {
+            SqlIdentifierUtil.assertInWhitelist(column,
+                    new java.util.HashSet<String>(java.util.Arrays.asList("email", "phone")),
+                    "fieldName");
+            userMapper.updateNullByEmptyString(column);
+        }
         return true;
     }
 

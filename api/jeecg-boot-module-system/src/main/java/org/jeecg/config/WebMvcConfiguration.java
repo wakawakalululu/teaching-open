@@ -33,18 +33,44 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
 		return new OnlineInterceptor();
 	}
 
+	/**
+	 * 允许的跨域来源白名单，逗号分隔，由 jeecg.cors.allowedOrigins 配置。
+	 *
+	 * <p>安全加固(V2.6)：原实现为 setAllowCredentials(true) + addAllowedOrigin("*") 组合，
+	 * 该组合会让任意站点携带用户 Cookie/凭据发起跨域请求并读取响应，
+	 * 属于高风险配置（浏览器虽会拒绝 "*" 与 credentials 共存，但部分网关/旧客户端
+	 * 仍可能出现绕过或降级行为）。现改为显式白名单，默认仅放行本站域名。
+	 */
+	@Value("${jeecg.cors.allowedOrigins:}")
+	private String allowedOrigins;
+
 	@Bean
 	public CorsFilter corsFilter() {
 		final UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
 		final CorsConfiguration corsConfiguration = new CorsConfiguration();
 		/* 是否允许请求带有验证信息 */
 		corsConfiguration.setAllowCredentials(true);
-		/* 允许访问的客户端域名 */
-		corsConfiguration.addAllowedOrigin("*");
+		/* 允许访问的客户端域名：仅白名单，禁止使用 "*" */
+		if (allowedOrigins == null || allowedOrigins.trim().isEmpty()) {
+			// 未配置时退化为仅允许同源（不添加任何 Origin，等价于不放行跨域）
+			corsConfiguration.setAllowedOrigins(new java.util.ArrayList<String>());
+		} else {
+			for (String origin : allowedOrigins.split(",")) {
+				String item = origin.trim();
+				if (!item.isEmpty() && !"*".equals(item)) {
+					corsConfiguration.addAllowedOrigin(item);
+				}
+			}
+		}
 		/* 允许服务端访问的客户端请求头 */
 		corsConfiguration.addAllowedHeader("*");
-		/* 允许访问的方法名,GET POST等 */
-		corsConfiguration.addAllowedMethod("*");
+		/* 允许访问的方法名,GET POST等（不放开 TRACE/TRACK） */
+		corsConfiguration.addAllowedMethod("GET");
+		corsConfiguration.addAllowedMethod("POST");
+		corsConfiguration.addAllowedMethod("PUT");
+		corsConfiguration.addAllowedMethod("DELETE");
+		corsConfiguration.addAllowedMethod("OPTIONS");
+		corsConfiguration.setMaxAge(3600L);
 		urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", corsConfiguration);
 		return new CorsFilter(urlBasedCorsConfigurationSource);
 	}

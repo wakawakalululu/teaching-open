@@ -9,11 +9,24 @@ server:
     min-response-size: 1024
     mime-types: application/javascript,application/json,application/xml,text/html,text/xml,text/plain,text/css,image/*
 
+# ===== 安全加固(V2.6) =====
+# 原配置 include: metrics,httptrace，会对外暴露 JVM/HTTP 轨迹等运行信息。
+# 生产环境仅保留健康检查，且 health 详情不对外显示。
 management:
   endpoints:
     web:
       exposure:
-        include: metrics,httptrace
+        include: health
+  endpoint:
+    health:
+      show-details: never
+# 关闭 Springfox 文档端点（与下方 swagger.enable 双重保险）
+springfox:
+  documentation:
+    enabled: false
+    auto-startup: false
+    swagger-ui:
+      enabled: false
 
 spring:
   servlet:
@@ -94,11 +107,17 @@ spring:
     exclude: com.alibaba.druid.spring.boot.autoconfigure.DruidDataSourceAutoConfigure
   datasource:
     druid:
+      # ===== 安全加固(V2.6) =====
+      # Druid 监控面板会展示 SQL、连接串、会话等敏感信息，且原配置为 admin/123456 弱口令，
+      # 同时在 ShiroConfig 中被设为 anon（匿名可达）。生产环境直接关闭该面板。
+      # 如确需临时排障，请改为 enabled: true 并设置强口令，同时限制 allow 来源 IP，
+      # 排障结束后立即关闭。
       stat-view-servlet:
-        enabled: true
-        loginUsername: admin
-        loginPassword: 123456
-        allow:
+        enabled: false
+        loginUsername: druid-monitor
+        loginPassword: CHANGE_ME_BY_ENV
+        allow: 127.0.0.1
+        resetEnable: false
       web-stat-filter:
         enabled: true
     dynamic:
@@ -186,7 +205,16 @@ jeecg :
     accessKeyId: ??
     accessKeySecret: ??
   shiro:
-    excludeUrls: /test/jeecgDemo/demo3,/test/jeecgDemo/redisDemo/**
+    # ===== 安全加固(V2.6) =====
+    # 原配置把 /test/jeecgDemo/demo3 与 /test/jeecgDemo/redisDemo/** 列为免鉴权，
+    # 而这两个是示例/调试接口（redisDemo 可直连 Redis 做读写验证），生产环境不应暴露。
+    # 这里清空，令其回到默认的 JWT 拦截链；示例模块本身也建议在生产打包时移除。
+    excludeUrls:
+  # ===== 安全加固(V2.6)：跨域来源白名单 =====
+  # 必须写成前端实际访问域名（含协议与端口），多个用英文逗号分隔。
+  # 留空表示不放行任何跨域请求（前后端同域部署时即为此情况，最安全）。
+  cors:
+    allowedOrigins: http://open.teaching.vip
   #阿里云oss存储配置
   oss:
     endpoint: oss-cn-beijing.aliyuncs.com
@@ -229,6 +257,8 @@ logging:
 #cas单点登录
 cas:
   prefixUrl: http://cas.example.org:8443/cas
-#enable swagger
+# ===== 安全加固(V2.6) =====
+# Swagger/OpenAPI 文档会完整暴露接口清单与入参结构，生产环境必须关闭。
+# 需要联调时在 dev/test 环境单独打开。
 swagger:
-  enable: true
+  enable: false

@@ -99,7 +99,9 @@
 		select ${query.text} as "text",${query.code} as "value" from ${query.table}
 		where 1 = 1
 		<if test="query.keyword != null and query.keyword != ''">
-			and (${query.text} like '%${query.keyword}%' or ${query.code} like '%${query.keyword}%')
+			<!-- 安全加固(V2.6)：keyword 原为 '%${query.keyword}%' 直接拼接，可闭合引号注入；
+			     改为 CONCAT + #{} 预编译绑定 -->
+			and (${query.text} like CONCAT('%', #{query.keyword}, '%') or ${query.code} like CONCAT('%', #{query.keyword}, '%'))
 		</if>
 		<if test="query.codeValue != null and query.codeValue != ''">
 			and ${query.code} = #{query.codeValue}

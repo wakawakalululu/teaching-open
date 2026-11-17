@@ -1018,9 +1018,18 @@ public class SysUserController {
 	}
 
 	/**
-	 * 根据用户名或手机号查询用户信息
-	 * @param
-	 * @return
+	 * 根据用户名或手机号查询用户信息。
+	 *
+	 * <p>安全加固(V2.6)：
+	 * <ol>
+	 *   <li>该接口在 ShiroConfig 中为 anon（注册/找回密码流程使用），属于匿名可枚举接口。
+	 *       原实现会原样返回用户完整手机号，等于对外提供"用户名→手机号"的批量查询能力，
+	 *       可被用于撞库与个人信息收集。现改为脱敏输出（保留前 3 位与后 4 位）。</li>
+	 *   <li>命中与未命中返回结构保持原有语义，避免因响应差异泄露账号是否存在之外的信息。</li>
+	 * </ol>
+	 *
+	 * @param sysUser 查询条件（phone 或 username 二选一）
+	 * @return 脱敏后的用户信息
 	 */
 	@GetMapping("/querySysUser")
 	public Result<Map<String, Object>> querySysUser(SysUser sysUser) {
@@ -1032,7 +1041,8 @@ public class SysUserController {
 			SysUser user = sysUserService.getUserByPhone(phone);
 			if(user!=null) {
 				map.put("username",user.getUsername());
-				map.put("phone",user.getPhone());
+				// 安全加固: 手机号脱敏，避免匿名接口泄露完整手机号
+				map.put("phone",desensitizePhone(user.getPhone()));
 				result.setSuccess(true);
 				result.setResult(map);
 				return result;
@@ -1042,7 +1052,8 @@ public class SysUserController {
 			SysUser user = sysUserService.getUserByName(username);
 			if(user!=null) {
 				map.put("username",user.getUsername());
-				map.put("phone",user.getPhone());
+				// 安全加固: 手机号脱敏，避免匿名接口泄露完整手机号
+				map.put("phone",desensitizePhone(user.getPhone()));
 				result.setSuccess(true);
 				result.setResult(map);
 				return result;
@@ -1051,6 +1062,28 @@ public class SysUserController {
 		result.setSuccess(false);
 		result.setMessage("验证失败");
 		return result;
+	}
+
+	/**
+	 * 手机号脱敏：保留前 3 位与后 4 位，中间以 **** 替代。
+	 * <p>长度不足 7 位时整体按敏感信息处理，返回等长的 * 串，避免间接泄露位数规律。
+	 *
+	 * @param phone 原始手机号
+	 * @return 脱敏后的手机号
+	 */
+	private String desensitizePhone(String phone) {
+		if (phone == null || phone.trim().isEmpty()) {
+			return phone;
+		}
+		String value = phone.trim();
+		if (value.length() < 7) {
+			StringBuilder masked = new StringBuilder();
+			for (int i = 0; i < value.length(); i++) {
+				masked.append('*');
+			}
+			return masked.toString();
+		}
+		return value.substring(0, 3) + "****" + value.substring(value.length() - 4);
 	}
 	
 	/**
@@ -1214,10 +1247,20 @@ public class SysUserController {
     public Result putRecycleBin(@RequestBody JSONObject jsonObject, HttpServletRequest request) {
         String userIds = jsonObject.getString("userIds");
         if (StringUtils.isNotBlank(userIds)) {
+            // 安全加固(V2.6)：先剔除空片段，避免 ["a", "", "b"] 这类输入进入 IN 子句
+            List<String> idList = new ArrayList<String>();
+            for (String id : userIds.split(",")) {
+                if (StringUtils.isNotBlank(id)) {
+                    idList.add(id.trim());
+                }
+            }
+            if (idList.isEmpty()) {
+                return Result.ok("还原成功");
+            }
             SysUser updateUser = new SysUser();
             updateUser.setUpdateBy(JwtUtil.getUserNameByToken(request));
             updateUser.setUpdateTime(new Date());
-            sysUserService.revertLogicDeleted(Arrays.asList(userIds.split(",")), updateUser);
+            sysUserService.revertLogicDeleted(idList, updateUser);
         }
         return Result.ok("还原成功");
     }
@@ -1231,7 +1274,17 @@ public class SysUserController {
     @RequestMapping(value = "/deleteRecycleBin", method = RequestMethod.DELETE)
     public Result deleteRecycleBin(@RequestParam("userIds") String userIds) {
         if (StringUtils.isNotBlank(userIds)) {
-            sysUserService.removeLogicDeleted(Arrays.asList(userIds.split(",")));
+            // 安全加固(V2.6)：同样剔除空片段后再进入批量删除
+            List<String> idList = new ArrayList<String>();
+            for (String id : userIds.split(",")) {
+                if (StringUtils.isNotBlank(id)) {
+                    idList.add(id.trim());
+                }
+            }
+            if (idList.isEmpty()) {
+                return Result.ok("删除成功");
+            }
+            sysUserService.removeLogicDeleted(idList);
         }
         return Result.ok("删除成功");
     }

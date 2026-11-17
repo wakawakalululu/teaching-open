@@ -126,13 +126,16 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
 	/**
 	 * 还原被逻辑删除的用户
+	 * <p>安全加固(V2.6)：userIds 由字符串拼接 ${} 改为 List + foreach #{} 预编译绑定，
+	 * 避免调用方传入畸形 ID 串造成注入。
 	 */
-	int revertLogicDeleted(@Param("userIds") String userIds, @Param("entity") SysUser entity);
+	int revertLogicDeleted(@Param("userIds") java.util.List<String> userIds, @Param("entity") SysUser entity);
 
 	/**
 	 * 彻底删除被逻辑删除的用户
+	 * <p>安全加固(V2.6)：同上，改为集合预编译绑定。
 	 */
-	int deleteLogicDeleted(@Param("userIds") String userIds);
+	int deleteLogicDeleted(@Param("userIds") java.util.List<String> userIds);
 
 	List<SysUserModel> getUserList(Page<SysUserModel> page, @Param("ew")QueryWrapper<SysUserModel> queryWrapper);
     /** 更新空字符串为null【此写法有sql注入风险，禁止随便用】 */
