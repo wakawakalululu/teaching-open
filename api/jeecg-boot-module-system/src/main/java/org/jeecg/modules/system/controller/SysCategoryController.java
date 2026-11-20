@@ -18,7 +18,6 @@ import org.jeecg.common.api.vo.Result;
 import org.jeecg.common.system.query.QueryGenerator;
 import org.jeecg.common.system.vo.DictModel;
 import org.jeecg.common.system.vo.LoginUser;
-import org.jeecg.common.util.SqlIdentifierUtil;
 import org.jeecg.common.util.oConvertUtils;
 import org.jeecg.modules.system.entity.SysCategory;
 import org.jeecg.modules.system.model.TreeSelectModel;
@@ -392,14 +391,6 @@ public class SysCategoryController {
 		 Map<String, String> query = null;
 		 if(oConvertUtils.isNotEmpty(condition)) {
 			 query = JSON.parseObject(condition, Map.class);
-			 // ===== 安全加固(V2.6) =====
-			 // query 的 key 会以 ${key} 形式拼进 SQL（见 SysCategoryMapper.queryListByPid），
-			 // 必须按标识符白名单逐项校验，阻断通过 condition 参数注入的可能。
-			 if (query != null) {
-				 for (String conditionKey : query.keySet()) {
-					 SqlIdentifierUtil.assertIdentifier(conditionKey, "conditionKey");
-				 }
-			 }
 		 }
 		 List<TreeSelectModel> ls = sysCategoryService.queryListByPid(pid,query);
 		 result.setSuccess(true);

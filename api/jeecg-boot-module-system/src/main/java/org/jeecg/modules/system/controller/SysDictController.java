@@ -21,8 +21,6 @@ import org.jeecg.common.system.vo.DictQuery;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.common.util.ImportExcelUtil;
 import org.jeecg.common.util.RedisUtil;
-import org.jeecg.common.util.RestrictedSqlFragmentUtil;
-import org.jeecg.common.util.SqlIdentifierUtil;
 import org.jeecg.common.util.SqlInjectionUtil;
 import org.jeecg.common.util.oConvertUtils;
 import org.jeecg.modules.shiro.vo.DefContants;
@@ -145,21 +143,10 @@ public class SysDictController {
 				//SQL注入校验（只限制非法串改数据库）
 				final String[] sqlInjCheck = {params[0],params[1],params[2]};
 				SqlInjectionUtil.filterContent(sqlInjCheck);
-
-				// ===== 安全加固(V2.6) =====
-				// 表名/列名会以 ${} 形式直接拼进 SQL，黑名单过滤不足以覆盖全部注入变形，
-				// 这里追加严格的白名单式标识符校验（字母数字下划线，禁用保留字）。
-				SqlIdentifierUtil.assertIdentifier(params[0], "dictTable");
-				SqlIdentifierUtil.assertIdentifier(params[1], "dictText");
-				SqlIdentifierUtil.assertIdentifier(params[2], "dictCode");
 				
 				if(params.length==4) {
 					//SQL注入校验（查询条件SQL 特殊check，此方法仅供此处使用）
 					SqlInjectionUtil.specialFilterContent(params[3]);
-					// 安全加固(V2.6)：filterSql 会以 where ${filterSql} 直接拼接，
-					// 黑名单过滤不足以阻断全部变体，追加受限片段校验
-					// （字符白名单 + 禁止语句堆叠/注释/系统函数 + 引号与括号配平）。
-					RestrictedSqlFragmentUtil.assertSafe(params[3], "dictFilter");
 					ls = sysDictService.queryTableDictItemsByCodeAndFilter(params[0],params[1],params[2],params[3]);
 				}else if (params.length==3) {
 					ls = sysDictService.queryTableDictItemsByCode(params[0],params[1],params[2]);

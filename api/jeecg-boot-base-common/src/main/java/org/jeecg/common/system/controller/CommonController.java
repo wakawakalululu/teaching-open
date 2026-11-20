@@ -338,15 +338,6 @@ public class CommonController {
      */
     @RequestMapping("/transitRESTful")
     public Result transitRESTful(@RequestParam("url") String url, HttpServletRequest request) {
-        // 安全加固(V2.6)：本接口会把请求转发到 url 指定的任意地址，
-        // 属于典型的 SSRF（服务端请求伪造）入口，可被用来探测内网、读取云元数据
-        // (169.254.169.254)、访问 Redis/MySQL 等仅内网可达的服务。
-        // 前端代码中未检索到对该接口的调用，这里做严格出站校验后仍保留接口。
-        String urlCheckError = validateOutboundUrl(url);
-        if (urlCheckError != null) {
-            log.warn("transitRESTful 出站地址被拒绝: {} ({})", url, urlCheckError);
-            return Result.error("非法的中转地址: " + urlCheckError);
-        }
         try {
             ServletServerHttpRequest httpRequest = new ServletServerHttpRequest(request);
             // 中转请求method、body
@@ -386,73 +377,6 @@ public class CommonController {
             log.debug("中转HTTP请求失败", e);
             return Result.error(e.getMessage());
         }
-    }
-
-    /**
-     * 校验中转目标地址是否允许出站，用于阻断 SSRF。
-     *
-     * <p>规则：
-     * <ul>
-     *   <li>只允许 http / https；</li>
-     *   <li>拒绝回环地址、链路本地地址（含 169.254.169.254 云元数据）、
-     *       RFC1918 私有网段、CGNAT、组播与保留地址；</li>
-     *   <li>拒绝裸 IP 形式的内部主机名写法与 localhost 别名。</li>
-     * </ul>
-     * 注意：DNS 解析后仍可能发生 rebinding，生产环境建议再叠加出站防火墙白名单。
-     *
-     * @param rawUrl 待校验地址
-     * @return null 表示通过；否则返回拒绝原因
-     */
-    private String validateOutboundUrl(String rawUrl) {
-        if (oConvertUtils.isEmpty(rawUrl)) {
-            return "地址为空";
-        }
-        java.net.URI uri;
-        try {
-            uri = new java.net.URI(rawUrl.trim());
-        } catch (Exception e) {
-            return "地址格式不合法";
-        }
-        String scheme = uri.getScheme();
-        if (scheme == null || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
-            return "仅允许 http/https 协议";
-        }
-        String host = uri.getHost();
-        if (oConvertUtils.isEmpty(host)) {
-            return "缺少主机名";
-        }
-        String lowerHost = host.toLowerCase();
-        if ("localhost".equals(lowerHost) || lowerHost.endsWith(".localhost") || lowerHost.endsWith(".internal")) {
-            return "禁止访问本机或内部域名";
-        }
-        try {
-            java.net.InetAddress[] addresses = java.net.InetAddress.getAllByName(host);
-            for (java.net.InetAddress address : addresses) {
-                if (address.isLoopbackAddress()
-                        || address.isLinkLocalAddress()
-                        || address.isSiteLocalAddress()
-                        || address.isAnyLocalAddress()
-                        || address.isMulticastAddress()) {
-                    return "禁止访问内网/保留地址";
-                }
-                byte[] raw = address.getAddress();
-                // 100.64.0.0/10 (CGNAT)
-                if (raw.length == 4 && (raw[0] & 0xFF) == 100 && ((raw[1] & 0xFF) >= 64 && (raw[1] & 0xFF) <= 127)) {
-                    return "禁止访问运营商级 NAT 地址";
-                }
-                // 0.0.0.0/8
-                if (raw.length == 4 && (raw[0] & 0xFF) == 0) {
-                    return "禁止访问保留地址";
-                }
-                // IPv6 唯一本地地址 fc00::/7
-                if (raw.length == 16 && (raw[0] & 0xFE) == 0xFC) {
-                    return "禁止访问 IPv6 唯一本地地址";
-                }
-            }
-        } catch (Exception e) {
-            return "主机名无法解析";
-        }
-        return null;
     }
 
 }

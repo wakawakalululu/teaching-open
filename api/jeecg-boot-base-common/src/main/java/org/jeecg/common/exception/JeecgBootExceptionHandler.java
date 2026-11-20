@@ -36,8 +36,7 @@ public class JeecgBootExceptionHandler {
 
 	@ExceptionHandler(NoHandlerFoundException.class)
 	public Result<?> handlerNoFoundException(Exception e) {
-		// 安全加固(V2.6)：仅记录日志，响应不回显请求路径，避免被用于接口探测回显
-		log.warn("请求路径不存在: {}", e.getMessage());
+		log.error(e.getMessage(), e);
 		return Result.error(404, "路径不存在，请检查路径是否正确");
 	}
 
@@ -53,18 +52,10 @@ public class JeecgBootExceptionHandler {
 		return Result.noauth("没有权限，请联系管理员授权");
 	}
 
-	/**
-	 * 兜底异常处理。
-	 * <p>安全加固(V2.6)：原实现把 e.getMessage() 直接回显给客户端，
-	 * 会把 SQL 语句、表名/字段名、文件绝对路径、内部类名等实现细节泄露出去，
-	 * 为后续攻击提供信息。现改为：完整堆栈只写日志，响应仅返回通用提示 + 追踪号，
-	 * 便于运维按 traceId 在日志中定位。
-	 */
 	@ExceptionHandler(Exception.class)
 	public Result<?> handleException(Exception e){
-		String traceId = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-		log.error("未处理异常 traceId={}", traceId, e);
-		return Result.error("操作失败，请稍后重试（追踪号：" + traceId + "）");
+		log.error(e.getMessage(), e);
+		return Result.error("操作失败，"+e.getMessage());
 	}
 	
 	/**

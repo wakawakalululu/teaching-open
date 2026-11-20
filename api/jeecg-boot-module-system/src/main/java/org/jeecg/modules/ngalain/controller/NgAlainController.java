@@ -12,7 +12,6 @@ import org.jeecg.common.system.vo.DictModel;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.modules.ngalain.service.NgAlainService;
 import org.jeecg.modules.system.service.ISysDictService;
-import org.jeecg.common.util.SqlIdentifierUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -80,24 +79,8 @@ public class NgAlainController {
         }
         return dictlist;
     }
-    /**
-     * 根据表名动态查询字典项。
-     *
-     * <p>安全加固(V2.6)：原实现把 table/key/value 三个路径参数原样交给
-     * NgAlainMapper 的 <code>select ${key} from ${table}</code>，属于可直接利用的
-     * SQL 注入；同时该接口在 ShiroConfig 中未被拦截。修复方式：
-     * <ol>
-     *   <li>先做严格标识符白名单校验，阻断一切非字母数字下划线输入；</li>
-     *   <li>value 使用 #{} 预编译绑定（见 Mapper 调整），不再拼接。</li>
-     * </ol>
-     * 若后续确认前端已无调用，可直接删除本接口。
-     */
     @RequestMapping(value = "/getDictItemsByTable/{table}/{key}/{value}", method = RequestMethod.GET)
     public Object getDictItemsByTable(@PathVariable String table,@PathVariable String key,@PathVariable String value) {
-        // 三个入参在 Mapper 中均以 ${} 拼接（table 为表名，key/value 为列名），全部按标识符校验
-        SqlIdentifierUtil.assertIdentifier(table, "table");
-        SqlIdentifierUtil.assertIdentifier(key, "key");
-        SqlIdentifierUtil.assertIdentifier(value, "value");
         return this.ngAlainService.getDictByTable(table,key,value);
     }
 }
