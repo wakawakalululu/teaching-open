@@ -9,6 +9,9 @@
 ## front
 **/*.lock
 
+## data
+deploy/data
+
 ## go
 *.exe
 *.exe~
@@ -22,6 +25,6 @@ goframe-server/manifest/config/config.prod.yaml
 goframe-server/.env
 .env
 
-## AI skills 安装产物（团队各自安装，不入库）
+## AI skills 安装产物（team 各自安装，不入库）
 .agents/
 skills-lock.json
