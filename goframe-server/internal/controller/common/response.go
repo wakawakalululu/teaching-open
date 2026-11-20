@@ -10,7 +10,6 @@
 package common
 
 import (
-	"net/http"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -23,8 +22,10 @@ func OK(r *ghttp.Request, data interface{}) {
 }
 
 // OKMsg 成功响应（自定义话术 + 数据，对应 Java result.success(msg)）。
+//
+// 注意：不要调用 WriteStatus——GoFrame 在未写内容时会把状态文本（"OK"）
+// 写入响应体，污染 JSON 输出；业务响应本就是 HTTP 200，无需显式设置。
 func OKMsg(r *ghttp.Request, message string, data interface{}) {
-	r.Response.WriteStatus(http.StatusOK)
 	r.Response.WriteJson(g.Map{
 		"success":   true,
 		"message":   message,
@@ -36,7 +37,6 @@ func OKMsg(r *ghttp.Request, message string, data interface{}) {
 
 // Fail 业务失败响应（HTTP 200 + success:false，对应 Java result.error500）。
 func Fail(r *ghttp.Request, message string) {
-	r.Response.WriteStatus(http.StatusOK)
 	r.Response.WriteJson(g.Map{
 		"success":   false,
 		"message":   message,

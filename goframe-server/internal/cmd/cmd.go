@@ -16,12 +16,14 @@ import (
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
+	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
+	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 )
 
 var (
@@ -89,11 +91,15 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	}
 	limiter := auth.NewLoginLimiter(cfg.Security.LoginFailLimit, cfg.Security.LoginFailWindow)
 	feishu := notify.NewFeishu(cfg.Security.FeishuWebhook)
-	loginSvc := svcLogin.New(tokens, limiter, feishu)
-	loginCtrl := ctrlLogin.New(loginSvc)
 	// P0-1 业务域：字典 / 分类 / 站点配置
-	dictCtrl := ctrlDict.New(svcDict.New())
+	dictSvc := svcDict.New()
+	dictCtrl := ctrlDict.New(dictSvc)
 	categoryCtrl := ctrlCategory.New(svcCategory.New())
+	// 登录链路（依赖字典服务随响应下发全量字典）
+	loginSvc := svcLogin.New(tokens, limiter, feishu, dictSvc)
+	loginCtrl := ctrlLogin.New(loginSvc)
+	// P0-2 业务域：菜单/权限
+	permissionCtrl := ctrlPermission.New(svcPermission.New())
 	configCtrl := ctrlConfig.New(svcConfig.New(svcConfig.SiteOptions{
 		UploadType:   cfg.Site.UploadType,
 		StaticDomain: cfg.Site.StaticDomain,
@@ -196,6 +202,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/sys/config/getAllConfigList", configCtrl.GetAllConfigList)
 		group.GET("/sys/config/getAllConfigMap", configCtrl.GetAllConfigMap)
 		group.POST("/sys/config/saveTenantConfig", configCtrl.SaveTenantConfig)
+
+		// 菜单/权限域（P0-2）
+		group.GET("/sys/permission/getUserPermissionByToken", permissionCtrl.GetUserPermissionByToken)
 	})
 
 	verifyRouteGuards()
@@ -243,6 +252,8 @@ func verifyRouteGuards() {
 	registerGuard("DELETE", "/api/sys/category/deleteBatch", true)
 	// 站点配置域（P0-1）
 	registerGuard("POST", "/api/sys/config/saveTenantConfig", true)
+	// 菜单/权限域（P0-2）
+	registerGuard("GET", "/api/sys/permission/getUserPermissionByToken", true)
 
 	for _, rt := range guardedRoutes {
 		if !isMutating(rt.method) {

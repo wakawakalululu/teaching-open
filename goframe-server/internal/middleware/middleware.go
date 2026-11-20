@@ -45,7 +45,7 @@ func CORS(allowedOrigins []string) ghttp.HandlerFunc {
 		normalized := strings.TrimRight(strings.ToLower(origin), "/")
 		if _, ok := allowed[normalized]; !ok {
 			if r.Method == http.MethodOptions {
-				r.Response.WriteStatus(http.StatusForbidden)
+				r.Response.WriteHeader(http.StatusForbidden)
 				return
 			}
 			r.Middleware.Next()
@@ -66,7 +66,7 @@ func CORS(allowedOrigins []string) ghttp.HandlerFunc {
 		resp.Header().Set("Access-Control-Max-Age", "3600")
 
 		if r.Method == http.MethodOptions {
-			r.Response.WriteStatus(http.StatusNoContent)
+			r.Response.WriteHeader(http.StatusNoContent)
 			return
 		}
 		r.Middleware.Next()
@@ -117,7 +117,7 @@ func extractToken(r *ghttp.Request) string {
 }
 
 func writeUnauthorized(r *ghttp.Request) {
-	r.Response.WriteStatus(http.StatusUnauthorized)
+	r.Response.WriteHeader(http.StatusUnauthorized)
 	r.Response.WriteJson(g.Map{
 		"success": false,
 		"code":    http.StatusUnauthorized,
@@ -130,7 +130,7 @@ func Recover(r *ghttp.Request) {
 	defer func() {
 		if err := recover(); err != nil {
 			g.Log().Errorf(r.Context(), "请求处理发生 panic path=%s panic=%v", r.URL.Path, err)
-			r.Response.WriteStatus(http.StatusInternalServerError)
+			r.Response.WriteHeader(http.StatusInternalServerError)
 			r.Response.WriteJson(g.Map{
 				"success": false,
 				"code":    http.StatusInternalServerError,

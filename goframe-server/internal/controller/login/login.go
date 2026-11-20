@@ -37,8 +37,11 @@ func ok(r *ghttp.Request, data interface{}) {
 }
 
 // fail 统一失败响应。
+//
+// 用 WriteHeader 而非 WriteStatus：后者会在未写内容时把状态文本
+// （如 "Unauthorized"）写入响应体，污染 JSON。
 func fail(r *ghttp.Request, status int, msg string) {
-	r.Response.WriteStatus(status)
+	r.Response.WriteHeader(status)
 	r.Response.WriteJson(g.Map{
 		"success": false,
 		"code":    status,
@@ -82,6 +85,8 @@ func (c *Controller) Login(r *ghttp.Request) {
 		"refreshToken": result.Tokens.RefreshToken,
 		"expiresIn":    result.Tokens.ExpiresIn,
 		"userInfo":     publicUser(result.User, result.Roles),
+		// Java 登录响应契约字段：前端缓存全量字典，免二次请求
+		"sysAllDictItems": result.DictItems,
 	})
 }
 
@@ -212,17 +217,25 @@ func (c *Controller) writePasswordError(r *ghttp.Request, err error) {
 }
 
 // publicUser 组装对外用户信息（白名单 DTO，新增字段默认不输出）。
+//
+// 字段选取依据：Java 登录响应为完整 SysUser 序列化，前端实际消费
+// username/realname/avatar/orgCode/id/birthday/userIdentity（web/src 全量
+// 扫描确认），此处输出白名单超集；password/salt 永不输出。
 func publicUser(u *entity.SysUser, roles []string) g.Map {
 	if u == nil {
 		return g.Map{}
 	}
 	resp := g.Map{
-		"id":       u.Id,
-		"username": u.Username,
-		"realname": u.Realname,
-		"avatar":   u.Avatar,
-		"orgCode":  u.OrgCode,
-		"roles":    roles,
+		"id":           u.Id,
+		"username":     u.Username,
+		"realname":     u.Realname,
+		"avatar":       u.Avatar,
+		"orgCode":      u.OrgCode,
+		"roles":        roles,
+		"birthday":     u.Birthday,
+		"sex":          u.Sex,
+		"userIdentity": u.UserIdentity,
+		"status":       u.Status,
 	}
 	if u.Phone != "" {
 		resp["phone"] = maskPhone(u.Phone)

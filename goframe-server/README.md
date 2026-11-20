@@ -92,7 +92,12 @@ go run .
 | POST | `/api/sys/login` | 账号密码登录 | 否 |
 | POST | `/api/sys/mLogin` | App 登录（同 login） | 否 |
 | POST | `/api/sys/refreshToken` | 刷新令牌换新 | 否 |
-| GET | `/api/sys/user/info` | 当前用户信息 | 是 |
+| GET | `/api/sys/user/info` | 当前用户信息（简化版） | 是 |
+| GET | `/api/sys/permission/getUserPermissionByToken` | 路由菜单树 + auth/allAuth 按钮权限（P0-2） | 是 |
+
+> 登录响应（login/mLogin）已含 Java 契约的 `sysAllDictItems`（全量字典，
+> 前端缓存后免二次请求）；`userInfo` 输出白名单超集（id/username/realname/
+> avatar/orgCode/birthday/sex/userIdentity/status + 脱敏 phone/email）。
 | POST | `/api/sys/logout` | 登出（吊销令牌） | 是 |
 | PUT | `/api/sys/user/updatePassword` | 自助改密（校验旧密码，仅本人） | 是 |
 | PUT | `/api/sys/user/changePassword` | 管理员重置他人密码（需 admin 角色） | 是 |
@@ -127,7 +132,7 @@ go run .
 | `probe` | 探测数据库连接、列出表 |
 | `importer` | 导入 `teachingopen2.6.sql`（自动关闭外键检查） |
 | `verifyseed` | 统计密码方案分布（bcrypt / legacy） |
-| `e2e` | 端到端验证登录 → rehash → 改密 → 越权拦截 |
+| `e2e` | 端到端验证（14 步）：登录/rehash/改密/越权拦截/登录响应字典/菜单权限树/字典与分类抽查 |
 
 ## 安全要点
 

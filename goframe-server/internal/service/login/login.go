@@ -17,6 +17,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/entity"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/passwd"
+	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/service/rbac"
 )
 
@@ -35,6 +36,9 @@ type LoginResult struct {
 	Tokens *auth.TokenPair
 	User   *entity.SysUser
 	Roles  []string
+	// DictItems 全量字典（Java 登录响应的 sysAllDictItems，前端缓存到
+	// localStorage 后不再二次请求；查询失败时为 nil 并仅告警）。
+	DictItems map[string][]svcDict.DictModel
 }
 
 // Service 处理登录用例。
@@ -43,15 +47,17 @@ type Service struct {
 	limiter *auth.LoginLimiter
 	legacy  *passwd.LegacyPBE
 	feishu  *notify.FeishuNotifier
+	dict    *svcDict.Service
 }
 
 // New 构造服务。
-func New(tokens *auth.Manager, limiter *auth.LoginLimiter, feishu *notify.FeishuNotifier) *Service {
+func New(tokens *auth.Manager, limiter *auth.LoginLimiter, feishu *notify.FeishuNotifier, dictSvc *svcDict.Service) *Service {
 	return &Service{
 		tokens:  tokens,
 		limiter: limiter,
 		legacy:  passwd.NewLegacyPBE(),
 		feishu:  feishu,
+		dict:    dictSvc,
 	}
 }
 
@@ -112,7 +118,16 @@ func (s *Service) Login(ctx context.Context, username, password, clientIP string
 		return nil, fmt.Errorf("签发令牌失败: %w", err)
 	}
 
-	return &LoginResult{Tokens: tokens, User: user, Roles: roles}, nil
+	// 全量字典随登录响应下发（Java userInfo() 契约）；失败不阻断登录
+	var dictItems map[string][]svcDict.DictModel
+	if s.dict != nil {
+		if dictItems, err = s.dict.QueryAllDictItems(ctx); err != nil {
+			g.Log().Warningf(ctx, "登录响应装载字典失败（前端将回退按需请求） err=%s", err.Error())
+			dictItems = nil
+		}
+	}
+
+	return &LoginResult{Tokens: tokens, User: user, Roles: roles, DictItems: dictItems}, nil
 }
 
 // verifyPassword 按存储方案校验密码，并在存量格式命中时触发升级。
