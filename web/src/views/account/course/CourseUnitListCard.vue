@@ -1,23 +1,16 @@
 <template>
   <div class="app-list">
-    <a-list :grid="{ gutter: 24, lg: 4, md: 3, sm: 2, xs: 1 }" :dataSource="dataSource">
-      <a-list-item slot="renderItem" slot-scope="item, index">
-        <a-card @click="viewUnit(item)">
-          <!-- <template class="ant-card-extra" slot="extra">
-            <span class="create-time">{{item.createTime}}</span>
-          </template> -->
-          <a-card-meta>
-              <div style="margin-bottom: 3px" slot="title">
-                <a-icon type="right-circle"/>&nbsp;&nbsp;
-                {{ item.unitName }}
-              </div>
-              <div class="meta-cardInfo" slot="description">
-                <img :src="getFileAccessHttpUrl(item.unitCover)" height="25px" alt="图片不存在" style="width:100%;height:100%;"/>
-              </div>
-          </a-card-meta>
-        </a-card>
-      </a-list-item>
-    </a-list>
+    <a-card v-for="item in dataSource" :key="item.id" @click="viewUnit(item)">
+      <a-card-meta>
+          <div style="margin-bottom: 3px" slot="title">
+            <a-icon type="right-circle"/>&nbsp;&nbsp;
+            {{ item.unitName }}
+          </div>
+          <div class="meta-cardInfo" slot="description">
+            <img :src="getFileAccessHttpUrl(item.unitCover)" height="25px" style="width:100%;height:100%;"/>
+          </div>
+      </a-card-meta>
+    </a-card>
     <unitView-modal ref="unitViewModal"/>
   </div>
 </template>
@@ -35,7 +28,7 @@ export default {
       courseInfo: {},
       url:{
         courseInfo: "/teaching/teachingCourse/queryById",
-        unitList: "/teaching/teachingCourseUnit/list"
+        unitList: "/teaching/teachingCourseUnit/mineUnit"
       },
       visible : false,
       unit: {}
@@ -50,7 +43,6 @@ export default {
     }
   },
   mounted() {
-    // this.getWorkList()
   },
   methods: {
     getFileAccessHttpUrl,
@@ -58,11 +50,11 @@ export default {
         getAction(this.url.courseInfo, {id: courseId}).then(res=>{
             console.log(res)
             if(res.success){
-                this.courseInfo = res.result
-                this.$route.meta.title = "我的课程-" + this.courseInfo.courseName
-                this.courseInfo.map = this.getFileAccessHttpUrl(this.courseInfo.map)
+              this.courseInfo = res.result
+              this.$route.meta.title = "我的课程-" + this.courseInfo.courseName
+              this.courseInfo.map = this.getFileAccessHttpUrl(this.courseInfo.map)
             }else{
-
+              this.$message.error(res.message)
             }
         })
     },
@@ -70,17 +62,14 @@ export default {
         getAction(this.url.unitList, {courseId: courseId, pageNo: 1, pageSize:99}).then(res=>{
             console.log(res)
             if(res.success){
-                this.dataSource = res.result.records
+              this.dataSource = res.result.records
             }else{
-
+              this.$message.error(res.message)
             }
         })
     },
     viewUnit(unit){
-      console.log(unit);
-      
-      this.$refs.unitViewModal.visible = true;
-      this.$refs.unitViewModal.unit = unit
+      this.$refs.unitViewModal.view(unit)
     },
   }
 }
@@ -89,7 +78,11 @@ export default {
 <style lang="less" scoped>
 .app-list {
   .ant-card {
-    height: 300px;
+    min-height: 200px;
+    max-height: 400px;
+    width: 300px;
+    display: inline-block;
+    margin: 20px;
   }
   .meta-cardInfo {
     zoom: 1;

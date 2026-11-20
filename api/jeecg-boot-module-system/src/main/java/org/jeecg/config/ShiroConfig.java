@@ -105,16 +105,18 @@ public class ShiroConfig {
 		filterChainDefinitionMap.put("/**/*.woff2", "anon");
 		// update-begin--Author:sunjianlei Date:20190813 for：排除字体格式的后缀
 
-		filterChainDefinitionMap.put("/druid/**", "anon");
+		//安全修复: Druid监控面板需要认证访问，不再设为anon
+		//filterChainDefinitionMap.put("/druid/**", "anon");
 		filterChainDefinitionMap.put("/swagger-ui.html", "anon");
 		filterChainDefinitionMap.put("/swagger**/**", "anon");
 		filterChainDefinitionMap.put("/webjars/**", "anon");
 		filterChainDefinitionMap.put("/v2/**", "anon");
-		
-		//性能监控
-		filterChainDefinitionMap.put("/actuator/metrics/**", "anon");
-		filterChainDefinitionMap.put("/actuator/httptrace/**", "anon");
-		filterChainDefinitionMap.put("/actuator/redis/**", "anon");
+
+		//安全修复: Actuator端点不再匿名访问，需要JWT认证
+		//filterChainDefinitionMap.put("/actuator/metrics/**", "anon");
+		//filterChainDefinitionMap.put("/actuator/httptrace/**", "anon");
+		//filterChainDefinitionMap.put("/actuator/redis/**", "anon");
+		filterChainDefinitionMap.put("/actuator/health/**", "anon");
 
         //大屏设计器排除
 		filterChainDefinitionMap.put("/big/screen/**", "anon");
@@ -139,14 +141,24 @@ public class ShiroConfig {
 
 		//支付
 		filterChainDefinitionMap.put("/teaching/teachingOrder/createOrder", "anon");
-
-		// 作业
+		//菜单
+		filterChainDefinitionMap.put("/teaching/menu/getUserMenu", "anon");
+		//配置
+		filterChainDefinitionMap.put("/sys/config/getCurrentConfig", "anon");
+		filterChainDefinitionMap.put("/sys/config/getConfig", "anon");
+		//字典
+		filterChainDefinitionMap.put("/sys/dict/getDictItems/**", "anon");
+		//社区
+		filterChainDefinitionMap.put("/teaching/teachingWork/userInfo", "anon");
 		filterChainDefinitionMap.put("/teaching/teachingWork/studentWorkInfo", "anon");
 		filterChainDefinitionMap.put("/teaching/teachingWork/greatWork", "anon");
 		filterChainDefinitionMap.put("/teaching/teachingWork/starWork", "anon");
 		filterChainDefinitionMap.put("/teaching/teachingWork/leaderboard", "anon");
 		filterChainDefinitionMap.put("/teaching/teachingWork/getWorkComments", "anon");
+		filterChainDefinitionMap.put("/teaching/teachingCourse/getHomeCourse", "anon");
 
+		filterChainDefinitionMap.put("/teaching/teachingNews/newsList", "anon");
+		filterChainDefinitionMap.put("/teaching/teachingNews/newsDetail", "anon");
 
 		//学生
 		filterChainDefinitionMap.put("/student/**", "anon");

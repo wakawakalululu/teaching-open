@@ -55,6 +55,10 @@
           <j-select-position placeholder="请选择职务" :multiple="false" v-decorator="['post', {}]"/>
         </a-form-item>
 
+        <a-form-item label="学校" :labelCol="labelCol" :wrapperCol="wrapperCol">
+          <a-input placeholder="请输入学校" v-decorator="[ 'school']" />
+        </a-form-item>
+
         <a-form-item label="角色分配" :labelCol="labelCol" :wrapperCol="wrapperCol" v-show="!roleDisabled" >
           <a-select
             mode="multiple"
@@ -153,7 +157,7 @@
   import JSelectPosition from '@/components/jeecgbiz/JSelectPosition'
   import { ACCESS_TOKEN } from "@/store/mutation-types"
   import { getAction } from '@/api/manage'
-  import {addUser,editUser,queryUserRole,queryall } from '@/api/api'
+  import {addUser,editUser,queryUserRole,queryMySubRole } from '@/api/api'
   import { disabledAuthFilter } from "@/utils/authFilter"
   import {duplicateCheck } from '@/api/api'
   import JImageUpload from '../../../components/jeecg/JImageUpload'
@@ -284,7 +288,7 @@
         this.modaltoggleFlag = !this.modaltoggleFlag;
       },
       initialRoleList(){
-        queryall().then((res)=>{
+        queryMySubRole().then((res)=>{
           if(res.success){
             this.roleList = res.result;
           }else{
@@ -314,7 +318,7 @@
       add () {
         this.picUrl = "";
         this.refresh();
-        this.edit({activitiSync:'1'});
+        this.edit({activitiSync:'1', userIdentity:'1'});
       },
       edit (record) {
         this.resetScreenSize(); // 调用此方法,根据屏幕宽度自适应调整抽屉的宽度
@@ -332,7 +336,7 @@
         that.visible = true;
         that.model = Object.assign({}, record);
         that.$nextTick(() => {
-          that.form.setFieldsValue(pick(this.model,'username','sex','realname','email','phone','activitiSync','workNo','telephone','post'))
+          that.form.setFieldsValue(pick(this.model,'username','sex','realname','email','phone','activitiSync','workNo','telephone','post','school'))
         });
         //身份为上级显示负责部门，否则不显示
         this.changeIdentity(this.model.userIdentity)
@@ -438,7 +442,17 @@
               formData.avatar = null;
             }
             formData.selectedroles = this.selectedRole.length>0?this.selectedRole.join(","):'';
+            if(formData.selectedroles == ''){
+              that.$message.warning('请选择角色');
+              that.confirmLoading = false;
+              return;
+            }
             formData.selecteddeparts = this.userDepartModel.departIdList.length>0?this.userDepartModel.departIdList.join(","):'';
+            if(formData.selecteddeparts == ''){
+              that.$message.warning('请选择班级');
+              that.confirmLoading = false;
+              return;
+            }
             formData.userIdentity=this.userIdentity;
             //如果是上级择传入departIds,否则为空
             if(this.userIdentity==="2"){

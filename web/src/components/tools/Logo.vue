@@ -1,7 +1,7 @@
 <template>
   <div class="logo">
     <router-link :to="{path:'/home'}">
-      <img src="/logo.png" alt="logo">
+      <img :src="logo" alt="logo">
       <h1 v-if="showTitle">{{ brandName }}</h1>
     </router-link>
   </div>
@@ -9,7 +9,7 @@
 
 <script>
   import { mixin } from '@/utils/mixin.js'
-
+  import { getFileAccessHttpUrl } from '@/api/manage'
   export default {
     name: 'Logo',
     mixins: [mixin],
@@ -20,11 +20,17 @@
         required: false
       }
     },
-     data () {
+    data () {
       return {
-         brandName: window._CONFIG['brandName']
+         brandName: this.$store.getters.sysConfig.brandName,
+         logo: '/logo.png'
       }
     },
+    created() {
+    if(this.$store.getters.sysConfig.logo){
+      this.logo = getFileAccessHttpUrl(this.$store.getters.sysConfig.logo)
+    }
+  },
   }
 </script>
 <style lang="less" scoped>

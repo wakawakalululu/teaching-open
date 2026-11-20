@@ -10,14 +10,17 @@
       :width="800"
     >
       <div class="video-area">
-        <a-tabs v-if="unit.courseVideo || unit.courseCase">
+        <a-tabs v-if="unit.courseVideo || unit.courseCase || unit.mediaContent">
           <a-tab-pane key="video" tab="视频" v-if="unit.courseVideo">
-            <video v-if="unit.courseVideoSource==1" :src="getQiniuFile(unit.courseVideo)" controls="true"></video>
-            <video v-if="unit.courseVideoSource==2" :src="unit.courseVideo" controls="true"></video>
+            <video v-if="unit.courseVideoSource==1" :src="unit.courseVideo_url" controls="true" controlsList='nodownload noremote footbar' oncontextmenu="return false;"></video>
+            <video v-if="unit.courseVideoSource==2" :src="unit.courseVideo" controls="true" controlsList='nodownload noremote footbar' oncontextmenu="return false;"></video>
             <div v-if="unit.courseVideoSource==3" v-html="unit.courseVideo"></div>
           </a-tab-pane>
           <a-tab-pane key="scratch" tab="案例" v-if="unit.courseCase">
-            <iframe id="player" :src="previewCourseCase(unit)"></iframe>
+            <iframe id="player" :src="previewCourseCase(unit)" scrolling="no"></iframe>
+          </a-tab-pane>
+          <a-tab-pane key="media" tab="课程内容" v-if="unit.mediaContent">
+            <div v-html="unit.mediaContent"></div>
           </a-tab-pane>
         </a-tabs>
       </div>
@@ -34,17 +37,34 @@
               <template v-slot:expandIcon="props">
                 <a-icon type="caret-right" :rotate="props.isActive ? 90 : 0" />
               </template>
-              <a-collapse-panel :header="'课后作业'" :style="customStyle">
-                <a
-                  target="_blank"
-                  @click="handleViewCode(unit)"
-                  ><a-icon type="edit" />{{ unit.unitName }} 去做作业</a
-                >
+              <a-collapse-panel v-if="unit.courseWork_url" key="0" :header="'课后作业'" :style="customStyle">
+                <a-button @click="handleViewCode(unit)" type="primary" icon="edit">去做作业</a-button>
               </a-collapse-panel>
               <a-collapse-panel v-if="unit.coursePpt" :header="'课程资料'" :style="customStyle">
-                <a target="_blank" :href="getFileAccessHttpUrl(unit.coursePpt)"
-                  ><a-icon type="edit" />{{ unit.unitName }} 查看资料</a
-                >
+                <div v-for="(u,i) in unit.coursePpt.split(',')" :key="i">
+                  <a v-if="u.endsWith('sb3')" target="_blank" :href="'/scratch3/index.html?scene=create&workFile='+u"
+                    ><a-icon type="code" /> {{(i+1)}}. 查看代码 </a
+                  >
+                  <a v-else-if="u.endsWith('ppt')||u.endsWith('pptx')" target="_blank" :href="getFilePrevew(u)"
+                    ><a-icon type="file-ppt" /> {{(i+1)}}. 查看PPT </a
+                  >
+                  <a v-else target="_blank" :href="getFilePrevew(u)"
+                    ><a-icon type="file" /> {{(i+1)}}. 查看资料 </a
+                  >
+                </div>
+              </a-collapse-panel>
+              <a-collapse-panel v-if="unit.coursePlan" :header="'课程教案'" :style="customStyle">
+                <div v-for="(u,i) in unit.coursePlan.split(',')" :key="i">
+                 <a v-if="u.endsWith('sb3')" target="_blank" :href="'/scratch3/index.html?scene=create&workFile='+u"
+                    ><a-icon type="code" /> {{(i+1)}}. 查看代码 </a
+                  >
+                  <a v-else-if="u.endsWith('ppt')||u.endsWith('pptx')" target="_blank" :href="getFilePrevew(u)"
+                    ><a-icon type="file-ppt" /> {{(i+1)}}. 查看PPT </a
+                  >
+                  <a v-else target="_blank" :href="getFilePrevew(u)"
+                    ><a-icon type="file" /> {{(i+1)}}. 查看资料 </a
+                  >
+                </div>
               </a-collapse-panel>
             </a-collapse>
           </a-col>
@@ -55,7 +75,7 @@
 </template>
 <script>
 
-import { getFileAccessHttpUrl } from '@/api/manage'
+import { getFileAccessHttpUrl,getAction, getFilePrevew } from '@/api/manage'
 export default {
   name: 'UnitViewModal',
   data() {
@@ -66,8 +86,33 @@ export default {
       scratchFrameHref: '',
     }
   },
+  mounted(){
+    //scratch全屏
+    document.addEventListener('scratchFullScreen', function (e) {
+      window.launchIntoFullscreen(document.getElementById('player'))
+    })
+    //scratch退出全屏
+    document.addEventListener('scratchUnFullScreen', function (e) {
+      window.exitFullscreen()
+    })
+    document.addEventListener('scratchInit', function (e) {
+      var p = document.getElementById('player')
+      var s = p.contentDocument.getElementById('scratch')
+      s.addEventListener('click', () => {
+        p.focus()
+      })
+    })
+  },
+  created(){
+  },
   methods: {
+    getFilePrevew,
     getFileAccessHttpUrl,
+    view(unit){
+      this.visible = true;
+      this.unit = unit
+      getAction('/teaching/teachingDepartDayLog/unitViewLog?unitId=' + this.unit.id)
+    },
     handleCancel(e) {
       this.unit = {}
       this.visible = false
@@ -80,7 +125,7 @@ export default {
         case 2:
           return '/scratch3/player.html?workUrl=' + url
         case 3:
-          return '/scratchjr/editor.html?mode=edit&filepath=' + url
+          return '/scratchjr/editor.html?mode=edit&workFile=' + url
         case 4:
           return '/python/player.html?lang=turtle&url='+ url
       }
@@ -94,10 +139,10 @@ export default {
           window.open('/scratch3/index.html?scene=course&unitId='+unit.id)
           break
         case 3:
-          window.open('/scratchjr/editor.html?mode=edit&filepath=' + this.getFileAccessHttpUrl(unit.courseWork))
+          window.open('/scratchjr/editor.html?scene=course&mode=edit&workFile=' + this.getFileAccessHttpUrl(unit.courseWork))
           break
         case 4:
-          window.open('/python/index.html?lang=turtle&unitId='+unit.id + "&url=" + this.getFileAccessHttpUrl(unit.courseWork))
+          window.open('/python/index.html?scene=course&lang=turtle&unitId='+unit.id + "&url=" + this.getFileAccessHttpUrl(unit.courseWork))
           break
         default:
           window.open(this.getFileAccessHttpUrl(unit.mediaPath))
@@ -115,8 +160,8 @@ export default {
 }
 #player {
   border: none;
-  width: 520px;
-  height: 400px;
+  width: 600px;
+  height: 500px;
   margin: auto;
   display: block;
 }

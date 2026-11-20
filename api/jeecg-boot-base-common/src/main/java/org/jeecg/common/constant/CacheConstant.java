@@ -6,6 +6,13 @@ package org.jeecg.common.constant;
  * @description: 缓存常量
  */
 public interface CacheConstant {
+	public static final String WORK_TAG = "work:tag:%s:%s";
+	public static final String USER_WORK_TAG = "work:tag:%s";
+
+	// Scratch
+	public static final String SCRATCH_CLOUD = "scratch:cloud:";
+	public static final String SCRATCH_BACKPACK_LIST = "scratch:backpackList:";
+	public static final String SCRATCH_BACKPACK_BODY = "scratch:backpackBody:";
 
 	/**
 	 * 字典信息缓存
@@ -20,6 +27,9 @@ public interface CacheConstant {
 	 * 数据权限配置缓存
 	 */
     public static final String SYS_DATA_PERMISSIONS_CACHE = "sys:cache:permission:datarules";
+
+    //菜单缓存
+    public static final String TEACHING_MENU_CACHE = "sys:cache:teaching:menu";
 
 	/**
 	 * 缓存用户信息

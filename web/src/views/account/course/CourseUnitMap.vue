@@ -43,7 +43,7 @@
         unitList:[],
         url:{
             courseInfo: "/teaching/teachingCourse/queryById",
-            unitList: "/teaching/teachingCourseUnit/list"
+            unitList: "/teaching/teachingCourseUnit/mineUnit"
         },
         visible : false,
         unit: {}
@@ -63,11 +63,11 @@
             getAction(this.url.courseInfo, {id: courseId}).then(res=>{
                 console.log(res)
                 if(res.success){
-                    this.courseInfo = res.result
-                    this.$route.meta.title = "我的课程-" + this.courseInfo.courseName
-                    this.courseInfo.map = this.getFileAccessHttpUrl(this.courseInfo.map)
+                  this.courseInfo = res.result
+                  this.$route.meta.title = "我的课程-" + this.courseInfo.courseName
+                  this.courseInfo.map = this.getFileAccessHttpUrl(this.courseInfo.map)
                 }else{
-
+                  this.$message.error(res.message)
                 }
             })
         },
@@ -75,17 +75,14 @@
             getAction(this.url.unitList, {courseId: courseId, pageNo: 1, pageSize:99}).then(res=>{
                 console.log(res)
                 if(res.success){
-                    this.unitList = res.result.records
+                  this.unitList = res.result.records
                 }else{
-
+                  this.$message.error(res.message)
                 }
             })
         },
         viewUnit(unit){
-          console.log(unit);
-          
-          this.$refs.unitViewModal.visible = true;
-          this.$refs.unitViewModal.unit = unit
+           this.$refs.unitViewModal.view(unit)
         },
     }
   }
@@ -118,7 +115,7 @@
     .unit-title{
         background-color: #52c41ab3;
         display: block; 
-        width: 64px;
+        width: fit-content;
         padding: .4em .6em .3em;
         font-size: 75%;
         font-weight: 700;

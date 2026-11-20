@@ -68,6 +68,9 @@ public class SysCategoryController {
 		if(oConvertUtils.isEmpty(sysCategory.getPid())){
 			sysCategory.setPid("0");
 		}
+		if(oConvertUtils.isNotEmpty(sysCategory.getPid())){
+			sysCategory.setCode(null);
+		}
 		Result<IPage<SysCategory>> result = new Result<IPage<SysCategory>>();
 		
 		//--author:os_chengtgen---date:20190804 -----for: 分类字典页面显示错误,issues:377--------start
@@ -85,6 +88,9 @@ public class SysCategoryController {
 	
 	@GetMapping(value = "/childList")
 	public Result<List<SysCategory>> queryPageList(SysCategory sysCategory,HttpServletRequest req) {
+		if(oConvertUtils.isNotEmpty(sysCategory.getPid())){
+			sysCategory.setCode(null);
+		}
 		Result<List<SysCategory>> result = new Result<List<SysCategory>>();
 		QueryWrapper<SysCategory> queryWrapper = QueryGenerator.initQueryWrapper(sysCategory, req.getParameterMap());
 		List<SysCategory> list = sysCategoryService.list(queryWrapper);

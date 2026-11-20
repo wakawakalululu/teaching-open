@@ -55,6 +55,7 @@ public class SysUser implements Serializable {
     /**
      * 密码
      */
+    @Excel(name = "密码")
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 
@@ -102,6 +103,13 @@ public class SysUser implements Serializable {
      */
     private String orgCode;
 
+    /**部门名称*/
+    @Excel(name = "所在部门", width = 15)
+    private transient String orgCodeTxt;
+
+    @Excel(name = "角色", width = 15)
+    private transient String roleTxt;
+
     /**
      * 状态(1：正常  2：冻结 ）
      */
@@ -127,6 +135,9 @@ public class SysUser implements Serializable {
      */
     @Excel(name = "职务", width = 15)
     private String post;
+
+    @Excel(name = "学校", width = 15)
+    private String school;
 
     /**
      * 座机号

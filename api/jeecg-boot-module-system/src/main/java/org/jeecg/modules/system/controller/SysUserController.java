@@ -20,13 +20,13 @@ import org.jeecg.common.aspect.annotation.PermissionData;
 import org.jeecg.common.constant.CommonConstant;
 import org.jeecg.common.system.api.ISysBaseAPI;
 import org.jeecg.common.system.query.QueryGenerator;
+import org.jeecg.common.system.util.JeecgDataAutorUtils;
 import org.jeecg.common.system.util.JwtUtil;
 import org.jeecg.common.system.vo.DictModel;
 import org.jeecg.common.system.vo.LoginUser;
-import org.jeecg.common.util.PasswordUtil;
-import org.jeecg.common.util.PmsUtil;
-import org.jeecg.common.util.RedisUtil;
-import org.jeecg.common.util.oConvertUtils;
+import org.jeecg.common.system.vo.SysPermissionDataRuleModel;
+import org.jeecg.common.util.*;
+import org.jeecg.modules.common.controller.BaseController;
 import org.jeecg.modules.system.entity.*;
 import org.jeecg.modules.system.model.DepartIdModel;
 import org.jeecg.modules.system.model.SysUserModel;
@@ -64,34 +64,25 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestController
 @RequestMapping("/sys/user")
-public class SysUserController {
+public class SysUserController extends BaseController {
 	@Autowired
 	private ISysBaseAPI sysBaseAPI;
-	
 	@Autowired
 	private ISysUserService sysUserService;
-
     @Autowired
     private ISysDepartService sysDepartService;
-
 	@Autowired
 	private ISysUserRoleService sysUserRoleService;
-
 	@Autowired
 	private ISysUserDepartService sysUserDepartService;
-
 	@Autowired
-	private ISysUserRoleService userRoleService;
-
+	private ISysRoleService sysRoleService;
     @Autowired
     private ISysDepartRoleUserService departRoleUserService;
-
     @Autowired
     private ISysDepartRoleService departRoleService;
-
     @Autowired
-    private ISysDictService sysDictService;
-
+    private ISysConfigService sysConfigService;
 	@Autowired
 	private RedisUtil redisUtil;
 
@@ -100,9 +91,9 @@ public class SysUserController {
 
     @PermissionData(pageComponent = "system/UserList")
 	@RequestMapping(value = "/list", method = RequestMethod.GET)
-	public Result<IPage<SysUserModel>> queryPageList(SysUserModel user, @RequestParam(name="pageNo", defaultValue="1") Integer pageNo,
+	public Result<IPage<SysUser>> queryPageList(SysUser user, @RequestParam(name="pageNo", defaultValue="1") Integer pageNo,
                                                 @RequestParam(name="pageSize", defaultValue="10") Integer pageSize, HttpServletRequest req) {
-		Result<IPage<SysUserModel>> result = new Result<IPage<SysUserModel>>();
+		Result<IPage<SysUser>> result = new Result<IPage<SysUser>>();
 //		QueryWrapper<SysUserModel> queryWrapper = QueryGenerator.initQueryWrapper(user, req.getParameterMap());
         Map<String, String[]> param = req.getParameterMap();
         String[] areaRaw = param.get("area");
@@ -113,18 +104,49 @@ public class SysUserController {
             provinceId = area.getString("provinceId");
             cityId = area.getString("cityId");
         }
+
+//        String departName = param.containsKey("departName")?param.get("departName")[0]:null;
+        String roleCode = param.containsKey("roleCode")?param.get("roleCode")[0]:null;
         String roleId = param.containsKey("roleId")?param.get("roleId")[0]:null;
-        String departName = param.containsKey("departName")?param.get("departName")[0]:null;
-        QueryWrapper<SysUserModel> queryWrapper = new QueryWrapper<>();
+
+        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(provinceId), "sys_user.province", provinceId);
         queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(cityId),"sys_user.city", cityId);
-        queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(roleId), "role_id", roleId);
-        queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(departName), "sys_depart.depart_name", departName);
-        queryWrapper.eq("sys_user.del_flag", 0);
+        queryWrapper.eq("sys_user.del_flag", 0); //过滤已删除用户
+
+        //departId批量查询条件
+        String departId = param.containsKey("departId")?param.get("departId")[0]:null;
+        if(StringUtils.isNotEmpty(departId)){
+            departId = "('" + departId.replaceAll(",", "','") + "')";
+            queryWrapper.inSql("sys_user.id","select user_id from sys_user_depart where dep_id in " + departId);
+        }
+        //roleCode查询条件
+        if (StringUtils.isNotEmpty(roleCode) && StringUtils.isEmpty(roleId)){
+            SysRole sysRole = sysRoleService.getRoleByCode(roleCode);
+            if (sysRole != null)roleId = sysRole.getId();
+        }
+        //roleId批量查询条件
+        if (StringUtils.isNotEmpty(roleId)){
+            roleId = "('" + roleId.replaceAll(",", "','") + "')";
+            queryWrapper.inSql("sys_user.id","select user_id from sys_user_role where role_id in " + roleId);
+        }
+
         QueryGenerator.installMplus(queryWrapper, user, req.getParameterMap());
 
-		Page<SysUserModel> page = new Page<SysUserModel>(pageNo, pageSize);
-        IPage<SysUserModel> pageList = sysUserService.getUserList(page, queryWrapper);
+        //非admin和dev角色，只显示自己管理的部门下的用户
+        List<String> myDeptIds = new ArrayList<>();
+        if(!hasRole("admin") && !hasRole("dev")){
+            myDeptIds = sysDepartService.getMySubDepIdsByDepId(getCurrentUser().getDepartIds());
+            if (myDeptIds==null || myDeptIds.isEmpty()){
+                result.error500("您没有负责的班级");
+                return result;
+            }
+            String myDeptIdStr = "('" + String.join("','", myDeptIds) + "')";
+            queryWrapper.inSql("sys_user.id","select user_id from sys_user_depart where dep_id in " + myDeptIdStr);
+        }
+
+		Page<SysUser> page = new Page<SysUser>(pageNo, pageSize);
+        IPage<SysUser> pageList = sysUserService.getUserList(page, queryWrapper);
 
 //		IPage<SysUserModel> pageList = sysUserService.page(page, queryWrapper);
 
@@ -132,12 +154,12 @@ public class SysUserController {
         //step.1 先拿到全部的 useids
         //step.2 通过 useids，一次性查询用户的所属部门名字
         List<String> userIds = pageList.getRecords().stream().map(SysUser::getId).collect(Collectors.toList());
-        if(userIds!=null && userIds.size()>0){
-            Map<String,String>  roleNames = sysUserService.getRoleNamesByUserIds(userIds);
-            pageList.getRecords().forEach(item->{
-                item.setRoleTxt(roleNames.get(item.getId()));
-            });
-        }
+        Map<String,String>  useDepNames = sysUserService.getDepNamesByUserIds(userIds);
+        Map<String,String>  roleNames = sysUserService.getRoleNamesByUserIds(userIds);
+        pageList.getRecords().forEach(item->{
+            item.setOrgCodeTxt(useDepNames.get(item.getId()));
+            item.setRoleTxt(roleNames.get(item.getId()));
+        });
 		result.setSuccess(true);
 		result.setResult(pageList);
 		log.info(pageList.toString());
@@ -149,6 +171,23 @@ public class SysUserController {
 	public Result<SysUser> add(@RequestBody JSONObject jsonObject) {
 		Result<SysUser> result = new Result<SysUser>();
 		String selectedRoles = jsonObject.getString("selectedroles");
+        if (StringUtils.isNotBlank(selectedRoles)){
+            int currentRoleLevel = getUserRoleLevel();
+            for (String roleId: selectedRoles.split(",")){
+                SysRole role = sysRoleService.getById(roleId);
+                if (role.getRoleLevel() > currentRoleLevel){
+                    result.error500("权限不足，无法分配所选角色");
+                    return result;
+                }
+            }
+        }else{
+            //默认学生角色
+            SysRole role = sysRoleService.getRoleByCode("student");
+            if (role!=null){
+                selectedRoles = role.getId();
+            }
+        }
+
 		String selectedDeparts = jsonObject.getString("selecteddeparts");
 		try {
 			SysUser user = JSON.parseObject(jsonObject.toJSONString(), SysUser.class);
@@ -181,12 +220,35 @@ public class SysUserController {
 			if(sysUser==null) {
 				result.error500("未找到对应实体");
 			}else {
+                if (lessThanUserRoleLevel(sysUser.getId())){
+                    result.error500("权限不足");
+                    return result;
+                }
+
 				SysUser user = JSON.parseObject(jsonObject.toJSONString(), SysUser.class);
 				user.setUpdateTime(new Date());
 				//String passwordEncode = PasswordUtil.encrypt(user.getUsername(), user.getPassword(), sysUser.getSalt());
 				user.setPassword(sysUser.getPassword());
 				String roles = jsonObject.getString("selectedroles");
                 String departs = jsonObject.getString("selecteddeparts");
+
+                if (StringUtils.isNotBlank(roles)){
+                    int currentRoleLevel = getUserRoleLevel();
+                    for (String roleId: roles.split(",")){
+                        SysRole role = sysRoleService.getById(roleId);
+                        if (role.getRoleLevel() > currentRoleLevel){
+                            result.error500("权限不足，无法分配所选角色");
+                            return result;
+                        }
+                    }
+                }else{
+                    //默认学生角色
+                    SysRole role = sysRoleService.getRoleByCode("student");
+                    if (role!=null){
+                        roles = role.getId();
+                    }
+                }
+
 				sysUserService.editUserWithRole(user, roles);
                 sysUserService.editUserWithDepart(user, departs);
                 sysUserService.updateNullPhoneEmail();
@@ -206,6 +268,9 @@ public class SysUserController {
 	@RequestMapping(value = "/delete", method = RequestMethod.DELETE)
 	public Result<?> delete(@RequestParam(name="id",required=true) String id) {
 		sysBaseAPI.addLog("删除用户，id： " +id ,CommonConstant.LOG_TYPE_2, 3);
+        if (lessThanUserRoleLevel(id)){
+            return Result.error("权限不足");
+        }
 		this.sysUserService.deleteUser(id);
 		return Result.ok("删除用户成功");
 	}
@@ -217,7 +282,12 @@ public class SysUserController {
 	@RequestMapping(value = "/deleteBatch", method = RequestMethod.DELETE)
 	public Result<?> deleteBatch(@RequestParam(name="ids",required=true) String ids) {
 		sysBaseAPI.addLog("批量删除用户， ids： " +ids ,CommonConstant.LOG_TYPE_2, 3);
-		this.sysUserService.deleteBatchUsers(ids);
+		for (String id: ids.split(",")){
+            if (lessThanUserRoleLevel(id)){
+                return Result.error("权限不足");
+            }
+        }
+        this.sysUserService.deleteBatchUsers(ids);
 		return Result.ok("批量删除用户成功");
 	}
 
@@ -236,6 +306,10 @@ public class SysUserController {
 			String[] arr = ids.split(",");
 			for (String id : arr) {
 				if(oConvertUtils.isNotEmpty(id)) {
+                    if (lessThanUserRoleLevel(id)){
+                        result.error500("权限不足");
+                        return result;
+                    }
 					this.sysUserService.update(new SysUser().setStatus(Integer.parseInt(status)),
 							new UpdateWrapper<SysUser>().lambda().eq(SysUser::getId,id));
 				}
@@ -294,8 +368,11 @@ public class SysUserController {
         result.setResult(true);
         try {
             //通过传入信息查询新的用户信息
-            SysUser user = sysUserService.getOne(new QueryWrapper<SysUser>(sysUser));
-            if (user != null) {
+            List<SysUser> user = sysUserService.list(new LambdaQueryWrapper<SysUser>()
+                    .eq(StringUtils.isNotBlank(sysUser.getPhone()), SysUser::getPhone, sysUser.getPhone())
+                    .eq(StringUtils.isNotBlank(sysUser.getEmail()), SysUser::getEmail, sysUser.getEmail())
+                    .eq(StringUtils.isNotBlank(sysUser.getUsername()), SysUser::getUsername, sysUser.getUsername()));
+            if (user != null && !user.isEmpty()) {
                 result.setSuccess(false);
                 result.setMessage("用户账号已存在");
                 return result;
@@ -316,9 +393,12 @@ public class SysUserController {
     //@RequiresRoles({"admin"})
     @RequestMapping(value = "/changePassword", method = RequestMethod.PUT)
     public Result<?> changePassword(@RequestBody SysUser sysUser) {
-        SysUser u = this.sysUserService.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, sysUser.getUsername()));
+        SysUser u = this.sysUserService.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getId, sysUser.getId()));
         if (u == null) {
             return Result.error("用户不存在！");
+        }
+        if (lessThanUserRoleLevel(u.getId())){
+            return Result.error("权限不足");
         }
         sysUser.setId(u.getId());
         return sysUserService.changePassword(sysUser);
@@ -419,7 +499,7 @@ public class SysUserController {
         String userSex = param.containsKey("userSex")?param.get("userSex")[0]:null;
         String status = param.containsKey("userStatus")?param.get("userStatus")[0]:null;
 
-        QueryWrapper<SysUserModel> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
 //        queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(provinceId), "sys_user.province", provinceId);
 //        queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(cityId),"sys_user.city", cityId);
         queryWrapper.eq(org.apache.commons.lang3.StringUtils.isNotEmpty(roleId), "role_id", roleId);
@@ -439,25 +519,31 @@ public class SysUserController {
             queryWrapper.in("sys_user.id",selections.split(","));
         }
 
+        //非admin和dev角色，只显示自己管理的部门下的用户
+        List<String> myDeptIds = new ArrayList<>();
+        if(!hasRole("admin") && !hasRole("dev")){
+            myDeptIds = sysDepartService.getMySubDepIdsByDepId(getCurrentUser().getDepartIds());
+            if (myDeptIds==null || myDeptIds.isEmpty()){
+                return null;
+            }
+            String myDeptIdStr = "('" + String.join("','", myDeptIds) + "')";
+            queryWrapper.inSql("sys_user.id","select user_id from sys_user_depart where dep_id in " + myDeptIdStr);
+        }
+
         QueryGenerator.installMplus(queryWrapper, sysUser, request.getParameterMap());
-        Page<SysUserModel> page = new Page<SysUserModel>(1, 999);
-        IPage<SysUserModel> pageList = sysUserService.getUserList(page, queryWrapper);
+        Page<SysUser> page = new Page<SysUser>(1, 999);
+        IPage<SysUser> pageList = sysUserService.getUserList(page, queryWrapper);
 
         //批量查询用户的所属部门
         //step.1 先拿到全部的 useids
         //step.2 通过 useids，一次性查询用户的所属部门名字
         List<String> userIds = pageList.getRecords().stream().map(SysUser::getId).collect(Collectors.toList());
-        if(userIds!=null && userIds.size()>0){
-            Map<String,String>  useDepNames = sysUserService.getDepNamesByUserIds(userIds);
-            pageList.getRecords().forEach(item->{
-                item.setOrgCodeTxt(useDepNames.get(item.getId()));
-            });
-
-            Map<String,String>  roleNames = sysUserService.getRoleNamesByUserIds(userIds);
-            pageList.getRecords().forEach(item->{
-                item.setRoleTxt(roleNames.get(item.getId()));
-            });
-        }
+        Map<String,String>  useDepNames = sysUserService.getDepNamesByUserIds(userIds);
+        Map<String,String>  roleNames = sysUserService.getRoleNamesByUserIds(userIds);
+        pageList.getRecords().forEach(item->{
+            item.setOrgCodeTxt(useDepNames.get(item.getId()));
+            item.setRoleTxt(roleNames.get(item.getId()));
+        });
 
 //        QueryWrapper<SysUser> queryWrapper = QueryGenerator.initQueryWrapper(sysUser, request.getParameterMap());
         //Step.2 AutoPoi 导出Excel
@@ -493,6 +579,9 @@ public class SysUserController {
         // 错误信息
         List<String> errorMessage = new ArrayList<>();
         int successLines = 0, errorLines = 0;
+
+        SysRole studentRole = sysRoleService.getRoleByCode("student");
+
         for (Map.Entry<String, MultipartFile> entity : fileMap.entrySet()) {
             MultipartFile file = entity.getValue();// 获取上传文件对象
             ImportParams params = new ImportParams();
@@ -502,11 +591,14 @@ public class SysUserController {
             try {
                 List<SysUserModel> listSysUsers = ExcelImportUtil.importExcel(file.getInputStream(), SysUserModel.class, params);
                 for (int i = 0; i < listSysUsers.size(); i++) {
+                    int lineNumber = i + 1;
                     SysUserModel sysUserExcel = listSysUsers.get(i);
                     if (StringUtils.isBlank(sysUserExcel.getPassword())) {
-                        // 密码默认为 “123456”
-                        sysUserExcel.setPassword("123456");
+                        sysUserExcel.setPassword("123456");// 密码默认为 “123456”
                     }
+                    sysUserExcel.setDelFlag(0);
+                    sysUserExcel.setUserIdentity(sysUserExcel.getUserIdentity() != null && sysUserExcel.getUserIdentity() == 2 ? 2:1);
+                    sysUserExcel.setStatus(1);
                     // 密码加密加盐
                     String salt = oConvertUtils.randomGen(8);
                     sysUserExcel.setSalt(salt);
@@ -518,7 +610,6 @@ public class SysUserController {
                     } catch (Exception e) {
                         errorLines++;
                         String message = e.getMessage();
-                        int lineNumber = i + 1;
                         // 通过索引名判断出错信息
                         if (message.contains(CommonConstant.SQL_INDEX_UNIQ_SYS_USER_USERNAME)) {
                             errorMessage.add("第 " + lineNumber + " 行：用户名已经存在，忽略导入。");
@@ -529,8 +620,7 @@ public class SysUserController {
                         } else if (message.contains(CommonConstant.SQL_INDEX_UNIQ_SYS_USER_EMAIL)) {
                             errorMessage.add("第 " + lineNumber + " 行：电子邮件已经存在，忽略导入。");
                         } else {
-                            errorMessage.add("第 " + lineNumber + " 行：未知错误，忽略导入");
-                            log.error(e.getMessage(), e);
+                            errorMessage.add("第 " + lineNumber + " 行：未知错误，忽略导入:" + e.getMessage());
                         }
                     }
                     // 批量将负责部门和用户信息建立关联关系
@@ -540,7 +630,18 @@ public class SysUserController {
                         String[] departIdArray = departIds.split(",");
                         List<SysUserDepart> userDepartList = new ArrayList<>(departIdArray.length);
                         for (String departId : departIdArray) {
-                            userDepartList.add(new SysUserDepart(userId, departId));
+                            SysDepart depart = sysDepartService.getOne(new QueryWrapper<SysDepart>().lambda()
+                                    .eq(SysDepart::getId, departId)
+                                    .or().eq(SysDepart::getOrgCode, departId)
+                                    .or().eq(SysDepart::getDepartName, departId)
+                                    .last("limit 1")
+                            );
+                            if (depart != null){
+                                userDepartList.add(new SysUserDepart(userId, depart.getId()));
+                            }else{
+                                errorLines++;
+                                errorMessage.add("第 " + lineNumber + " 行：部门不存在。");
+                            }
                         }
                         sysUserDepartService.saveBatch(userDepartList);
                     }
@@ -552,9 +653,22 @@ public class SysUserController {
                         String[] roleIdArray = roleIds.split(",");
                         List<SysUserRole> userRoleList = new ArrayList<>(roleIdArray.length);
                         for (String roleId : roleIdArray) {
-                            userRoleList.add(new SysUserRole(userId, roleId));
+                            SysRole role = sysRoleService.getOne(new QueryWrapper<SysRole>().lambda()
+                                    .eq(SysRole::getId, roleId)
+                                    .or().eq(SysRole::getRoleCode, roleId)
+                                    .or().eq(SysRole::getRoleName, roleId)
+                                    .last("limit 1")
+                            );
+                            if (role != null){
+                                userRoleList.add(new SysUserRole(userId, role.getId()));
+                            }else{
+                                errorLines++;
+                                errorMessage.add("第 " + lineNumber + " 行：角色不存在。");
+                            }
                         }
                         sysUserRoleService.saveBatch(userRoleList);
+                    }else if(studentRole != null){ //默认student角色
+                        sysUserRoleService.save(new SysUserRole(sysUserExcel.getId(), studentRole.getId()));
                     }
 
                 }
@@ -591,6 +705,105 @@ public class SysUserController {
             return res;
         }
     }
+
+    @RequestMapping(value = "/importStudent", method = RequestMethod.POST)
+    public Result<?> importStudent(@RequestParam(required = false)String departIds, //默认班级ID
+                                   HttpServletRequest request, HttpServletResponse response)throws IOException {
+        MultipartHttpServletRequest multipartRequest = (MultipartHttpServletRequest) request;
+        Map<String, MultipartFile> fileMap = multipartRequest.getFileMap();
+        // 错误信息
+        List<String> errorMessage = new ArrayList<>();
+
+        SysRole studentRole = sysRoleService.getRoleByCode("student");
+        if (studentRole == null){ return Result.error("student角色不存在"); }
+
+        int successLines = 0, errorLines = 0;
+        for (Map.Entry<String, MultipartFile> entity : fileMap.entrySet()) {
+            MultipartFile file = entity.getValue();// 获取上传文件对象
+            ImportParams params = new ImportParams();
+            params.setTitleRows(2);
+            params.setHeadRows(1);
+            params.setNeedSave(true);
+            try {
+                List<SysUser> listSysUsers = ExcelImportUtil.importExcel(file.getInputStream(), SysUser.class, params);
+                for (int i = 0; i < listSysUsers.size(); i++) {
+                    int lineNumber = i + 1;
+                    SysUser sysUserExcel = listSysUsers.get(i);
+                    if(sysUserExcel == null || StringUtils.isEmpty(sysUserExcel.getUsername())){
+                        errorMessage.add("第 " + lineNumber + " 行：账号为空，忽略导入。");
+                        errorLines++;
+                        continue;
+                    }
+                    sysUserExcel.setUserIdentity(1);
+                    sysUserExcel.setDelFlag(0);
+                    sysUserExcel.setStatus(1);
+                    //判断是否有密码字段，没有则使用用户名生成密码
+                    String password;
+                    if(StringUtils.isNotBlank(sysUserExcel.getPassword())){
+                        password = sysUserExcel.getPassword();
+                    }else{
+                        password = "123456";
+                    }
+                    // 密码加密加盐
+                    String salt = oConvertUtils.randomGen(8);
+                    sysUserExcel.setSalt(salt);
+                    String passwordEncode = PasswordUtil.encrypt(sysUserExcel.getUsername(), password, salt);
+                    sysUserExcel.setPassword(passwordEncode);
+
+                    SysUser oldUser = sysUserService.getUserByName(sysUserExcel.getUsername());
+                    if (oldUser != null){
+                        sysUserExcel.setId(oldUser.getId());
+                        successLines++;
+                    }else{
+                        try {
+                            sysUserService.save(sysUserExcel);
+                            successLines++;
+                        } catch (Exception e) {
+                            errorLines++;
+                            String message = e.getMessage();
+                            // 通过索引名判断出错信息
+                            if (message.contains(CommonConstant.SQL_INDEX_UNIQ_SYS_USER_USERNAME)) {
+                                errorMessage.add("第 " + lineNumber + " 行：用户名已经存在，忽略导入。");
+                            } else if (message.contains(CommonConstant.SQL_INDEX_UNIQ_SYS_USER_PHONE)) {
+                                errorMessage.add("第 " + lineNumber + " 行：手机号已经存在，忽略导入。");
+                            } else {
+                                errorMessage.add("第 " + lineNumber + " 行：" + e.getMessage());
+                                log.error(e.getMessage(), e);
+                            }
+                        }
+                    }
+
+                    // 批量将负责部门和用户信息建立关联关系
+                    if (StringUtils.isBlank(departIds)){
+                        departIds = sysUserExcel.getOrgCodeTxt();
+                    }
+                    if (StringUtils.isNotBlank(departIds)) {
+                        String userId = sysUserExcel.getId();
+                        String[] departIdArray = departIds.split(",");
+                        List<SysUserDepart> userDepartList = new ArrayList<>(departIdArray.length);
+                        for (String d : departIdArray) {
+                            userDepartList.add(new SysUserDepart(userId, d));
+                        }
+                        sysUserDepartService.saveBatch(userDepartList);
+                    }
+                    // 批量将角色和用户信息建立关联关系
+                    sysUserRoleService.save(new SysUserRole(sysUserExcel.getId(), studentRole.getId()));
+
+                }
+            } catch (Exception e) {
+                errorMessage.add("发生异常：" + e.getMessage());
+                log.error(e.getMessage(), e);
+            } finally {
+                try {
+                    file.getInputStream().close();
+                } catch (IOException e) {
+                    log.error(e.getMessage(), e);
+                }
+            }
+        }
+        return ImportExcelUtil.imporReturnRes(errorLines,successLines,errorMessage);
+    }
+
 
     /**
 	 * @功能：根据id 批量查询
@@ -651,6 +864,10 @@ public class SysUserController {
         try {
             String sysRoleId = sysUserRoleVO.getRoleId();
             for(String sysUserId:sysUserRoleVO.getUserIdList()) {
+                if (lessThanUserRoleLevel(sysUserId)){
+                    result.error500("权限不足");
+                    return result;
+                }
                 SysUserRole sysUserRole = new SysUserRole(sysUserId,sysRoleId);
                 QueryWrapper<SysUserRole> queryWrapper = new QueryWrapper<SysUserRole>();
                 queryWrapper.eq("role_id", sysRoleId).eq("user_id",sysUserId);
@@ -681,6 +898,10 @@ public class SysUserController {
                                                     @RequestParam(name="userId",required=true) String userId
     ) {
         Result<SysUserRole> result = new Result<SysUserRole>();
+        if (lessThanUserRoleLevel(userId)){
+            result.error500("权限不足");
+            return result;
+        }
         try {
             QueryWrapper<SysUserRole> queryWrapper = new QueryWrapper<SysUserRole>();
             queryWrapper.eq("role_id", roleId).eq("user_id",userId);
@@ -705,6 +926,12 @@ public class SysUserController {
             @RequestParam(name="roleId") String roleId,
             @RequestParam(name="userIds",required=true) String userIds) {
         Result<SysUserRole> result = new Result<SysUserRole>();
+        for (String id: userIds.split(",")){
+            if (lessThanUserRoleLevel(id)){
+                result.error500("权限不足");
+                return result;
+            }
+        }
         try {
             QueryWrapper<SysUserRole> queryWrapper = new QueryWrapper<SysUserRole>();
             queryWrapper.eq("role_id", roleId).in("user_id",Arrays.asList(userIds.split(",")));
@@ -720,28 +947,32 @@ public class SysUserController {
     /**
      * 部门用户列表
      */
+    @PermissionData(pageComponent = "system/DepartList")
     @RequestMapping(value = "/departUserList", method = RequestMethod.GET)
-    public Result<IPage<SysUser>> departUserList(@RequestParam(name="pageNo", defaultValue="1") Integer pageNo,
+    public Result<IPage<SysUser>> departUserList(SysUser user, @RequestParam(name="pageNo", defaultValue="1") Integer pageNo,
                                                  @RequestParam(name="pageSize", defaultValue="10") Integer pageSize, HttpServletRequest req) {
         Result<IPage<SysUser>> result = new Result<IPage<SysUser>>();
         Page<SysUser> page = new Page<SysUser>(pageNo, pageSize);
         String depId = req.getParameter("depId");
-        String username = req.getParameter("username");
-        String realname = req.getParameter("realname");
+        QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
+        QueryGenerator.installMplus(queryWrapper, user, req.getParameterMap());
+
         //根据部门ID查询,当前和下级所有的部门IDS
         List<String> subDepids = new ArrayList<>();
         //部门id为空时，查询我的部门下所有用户
         if(oConvertUtils.isEmpty(depId)){
-            LoginUser user = (LoginUser) SecurityUtils.getSubject().getPrincipal();
-            int userIdentity = user.getUserIdentity() != null?user.getUserIdentity():CommonConstant.USER_IDENTITY_1;
+            LoginUser loginUser = (LoginUser) SecurityUtils.getSubject().getPrincipal();
+            int userIdentity = loginUser.getUserIdentity() != null?loginUser.getUserIdentity():CommonConstant.USER_IDENTITY_1;
             if(oConvertUtils.isNotEmpty(userIdentity) && userIdentity == CommonConstant.USER_IDENTITY_2 ){
-                subDepids = sysDepartService.getMySubDepIdsByDepId(user.getDepartIds());
+                subDepids = sysDepartService.getMySubDepIdsByDepId(loginUser.getDepartIds());
             }
         }else{
             subDepids = sysDepartService.getSubDepIdsByDepId(depId);
         }
         if(subDepids != null && subDepids.size()>0){
-            IPage<SysUser> pageList = sysUserService.getUserByDepIds(page,subDepids,username,realname);
+            String myDeptIdStr = "('" + String.join("','", subDepids) + "')";
+            queryWrapper.inSql("sys_user.id","select user_id from sys_user_depart where dep_id in " + myDeptIdStr);
+            IPage<SysUser> pageList = sysUserService.getUserList(page,queryWrapper);
             //批量查询用户的所属部门
             //step.1 先拿到全部的 useids
             //step.2 通过 useids，一次性查询用户的所属部门名字
@@ -862,6 +1093,10 @@ public class SysUserController {
                                                     @RequestParam(name="userId",required=true) String userId
     ) {
         Result<SysUserDepart> result = new Result<SysUserDepart>();
+        if (lessThanUserRoleLevel(userId)){
+            result.error500("权限不足");
+            return result;
+        }
         try {
             QueryWrapper<SysUserDepart> queryWrapper = new QueryWrapper<SysUserDepart>();
             queryWrapper.eq("dep_id", depId).eq("user_id",userId);
@@ -894,6 +1129,12 @@ public class SysUserController {
             @RequestParam(name="depId") String depId,
             @RequestParam(name="userIds",required=true) String userIds) {
         Result<SysUserDepart> result = new Result<SysUserDepart>();
+        for (String id: userIds.split(",")){
+            if (lessThanUserRoleLevel(id)){
+                result.error500("权限不足");
+                return result;
+            }
+        }
         try {
             QueryWrapper<SysUserDepart> queryWrapper = new QueryWrapper<SysUserDepart>();
             queryWrapper.eq("dep_id", depId).in("user_id",Arrays.asList(userIds.split(",")));
@@ -948,6 +1189,7 @@ public class SysUserController {
 		String smscode = jsonObject.getString("smscode");
 		Object code = redisUtil.get(phone);
 		String username = jsonObject.getString("username");
+		String realname = jsonObject.getString("realname");
 		//未设置用户名，则用手机号作为用户名
 		if(oConvertUtils.isEmpty(username)){
             username = phone;
@@ -979,7 +1221,7 @@ public class SysUserController {
                 return result;
             }
         }
-        if(oConvertUtils.isNotEmpty(phone)){
+        if(oConvertUtils.isNotEmpty(phone) && oConvertUtils.isNotEmpty(smscode)){
             if (!smscode.equals(code)) {
                 result.setMessage("手机验证码错误");
                 result.setSuccess(false);
@@ -987,13 +1229,22 @@ public class SysUserController {
             }
         }
 
+        String allowReg = sysConfigService.getConfigItem("allowReg");
+        if (!"1".equals(allowReg)){
+            result.setSuccess(false);
+            result.setMessage("未开放注册");
+            return result;
+        }
+        String defaultRole = sysConfigService.getConfigItem("_defaultRole");
+        String defaultDepart = sysConfigService.getConfigItem("_defaultDepart");
+
 		try {
 			user.setCreateTime(new Date());// 设置创建时间
 			String salt = oConvertUtils.randomGen(8);
 			String passwordEncode = PasswordUtil.encrypt(username, password, salt);
 			user.setSalt(salt);
 			user.setUsername(username);
-			user.setRealname(username);
+			user.setRealname(realname);
 			user.setPassword(passwordEncode);
 			user.setEmail(email);
 			user.setPhone(phone);
@@ -1001,14 +1252,11 @@ public class SysUserController {
 			user.setDelFlag(CommonConstant.DEL_FLAG_0);
 			user.setActivitiSync(CommonConstant.ACT_SYNC_0);
 			sysUserService.save(user);
-            DictModel defaultRole = sysDictService.queryDictItemByCode("sys_config", "default_role");
             if (defaultRole != null){
-//                sysUserService.addUserWithRole(user,"ee8626f80f7c2619917b6236f3a7f02b");//默认 test
-                sysUserService.addUserWithRole(user,defaultRole.getValue());
+                sysUserService.addUserWithRole(user,defaultRole);
             }
-            DictModel defaultDepart = sysDictService.queryDictItemByCode("sys_config", "default_depart");
             if (defaultDepart != null){
-                sysUserService.addUserWithDepart(user, defaultDepart.getValue());
+                sysUserService.addUserWithDepart(user, defaultDepart);
             }
             result.success("注册成功");
 		} catch (Exception e) {
@@ -1019,6 +1267,7 @@ public class SysUserController {
 
 	/**
 	 * 根据用户名或手机号查询用户信息
+	 * 安全修复: 对返回的手机号进行脱敏处理，防止敏感信息泄露 (CVE-2021-37305)
 	 * @param
 	 * @return
 	 */
@@ -1032,7 +1281,7 @@ public class SysUserController {
 			SysUser user = sysUserService.getUserByPhone(phone);
 			if(user!=null) {
 				map.put("username",user.getUsername());
-				map.put("phone",user.getPhone());
+				map.put("phone", desensitizePhone(user.getPhone()));
 				result.setSuccess(true);
 				result.setResult(map);
 				return result;
@@ -1042,7 +1291,7 @@ public class SysUserController {
 			SysUser user = sysUserService.getUserByName(username);
 			if(user!=null) {
 				map.put("username",user.getUsername());
-				map.put("phone",user.getPhone());
+				map.put("phone", desensitizePhone(user.getPhone()));
 				result.setSuccess(true);
 				result.setResult(map);
 				return result;
@@ -1051,6 +1300,18 @@ public class SysUserController {
 		result.setSuccess(false);
 		result.setMessage("验证失败");
 		return result;
+	}
+
+	/**
+	 * 手机号脱敏处理：保留前3位和后4位，中间用****替代
+	 * @param phone 原始手机号
+	 * @return 脱敏后的手机号
+	 */
+	private String desensitizePhone(String phone) {
+		if (phone != null && phone.length() >= 7) {
+			return phone.substring(0, 3) + "****" + phone.substring(phone.length() - 4);
+		}
+		return phone;
 	}
 	
 	/**

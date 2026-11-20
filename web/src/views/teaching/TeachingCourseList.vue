@@ -10,6 +10,16 @@
             </a-form-item>
           </a-col>
           <a-col :xl="6" :lg="7" :md="8" :sm="24">
+            <a-form-item label="课程类型">
+              <j-dict-select-tag type="list" v-model="queryParam.courseType" dictCode="course_type" placeholder="请选择课程类型"/>
+            </a-form-item>
+          </a-col>
+          <a-col :xl="6" :lg="7" :md="8" :sm="24">
+            <a-form-item label="授权部门">
+              <j-select-depart placeholder="请选择授权部门或其子部门"  :rootOpened="true" v-model="queryParam.departId" />
+            </a-form-item>
+          </a-col>
+          <a-col :xl="6" :lg="7" :md="8" :sm="24">
             <span style="float: left;overflow: hidden;" class="table-page-search-submitButtons">
               <a-button type="primary" @click="searchQuery" icon="search">查询</a-button>
               <a-button type="primary" @click="searchReset" icon="reload" style="margin-left: 8px">重置</a-button>
@@ -32,6 +42,8 @@
       <a-upload v-if="false" name="file" :showUploadList="false" :multiple="false" :headers="tokenHeader" :action="importExcelUrl" @change="handleImportExcel">
         <a-button type="primary" icon="import">导入</a-button>
       </a-upload>
+      <a-button type="primary" @click="handleEditDict('course_type')">课程性质管理</a-button>
+      <a-button type="primary" @click="handleEditDict('course_category')">课程类分类管理</a-button>
       <a-dropdown v-if="selectedRowKeys.length > 0">
         <a-menu slot="overlay">
           <a-menu-item key="1" @click="batchDel"><a-icon type="delete"/>删除</a-menu-item>
@@ -100,6 +112,7 @@
       </a-table>
     </div>
     <teachingCourse-modal ref="modalForm" @ok="modalFormOk"></teachingCourse-modal>
+    <DictItemList ref="dictItemList"/>
   </a-card>
 </template>
 
@@ -107,12 +120,16 @@
 
   import { JeecgListMixin } from '@/mixins/JeecgListMixin'
   import TeachingCourseModal from './modules/TeachingCourseModal'
-
+  import JSelectDepart from '@/components/jeecgbiz/JSelectDepart'
+  import DictItemList from '../system/DictItemList'
+  import { getFileAccessHttpUrl } from "@/api/manage"
   export default {
     name: "TeachingCourseList",
     mixins:[JeecgListMixin],
     components: {
-      TeachingCourseModal
+      TeachingCourseModal,
+      JSelectDepart,
+      DictItemList
     },
     data () {
       return {
@@ -130,6 +147,16 @@
             }
           },
           {
+            title:'课程性质',
+            align:"center",
+            dataIndex: 'courseType_dictText'
+          },
+          {
+            title:'课程分类',
+            align:"center",
+            dataIndex: 'courseCategory_dictText'
+          },
+          {
             title:'课程名',
             align:"center",
             dataIndex: 'courseName'
@@ -143,11 +170,24 @@
             }
           },
           {
-            title:'课程图标',
+            title:'首页展示',
             align:"center",
-            dataIndex: 'courseIcon',
-            scopedSlots: {customRender: 'imgSlot'}
+            dataIndex: 'showHome',
+            customRender(v){
+              return v?"是":"否"
+            }
           },
+          {
+            title:'授权部门',
+            align:"center",
+            dataIndex: 'departIds_dictText',
+          },
+          // {
+          //   title:'课程图标',
+          //   align:"center",
+          //   dataIndex: 'courseIcon',
+          //   scopedSlots: {customRender: 'imgSlot'}
+          // },
           {
             title:'课程封面',
             align:"center",
@@ -208,6 +248,10 @@
             courseId: record.id
           }
         })
+      },
+      //打开字典编辑器
+      handleEditDict(dictCode){
+        this.$refs.dictItemList.open(dictCode)
       },
     }
   }

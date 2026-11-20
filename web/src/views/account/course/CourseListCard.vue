@@ -1,43 +1,33 @@
 <template>
   <div class="app-list">
-    <a-list :grid="{ gutter: 24, xxl:4, xl:4, lg: 3, md: 2, sm: 1, xs: 1 }" :dataSource="dataSource">
-      <a-list-item slot="renderItem" slot-scope="item, index">
-        <a-card :hoverable="true">
-          <!-- <template class="ant-card-extra" slot="extra">
-            <span class="create-time">{{item.createTime}}</span>
-          </template> -->
-          <a-card-meta>
-            <div style="margin-bottom: 3px" slot="title">{{ item.courseName }}</div>
-            <div class="meta-cardInfo" slot="description">
-              <router-link
-                v-if="item.showType == 1"
-                :to="{ name: 'teaching-mineCourse-courseUnitMap', query: { id: item.id } }"
-              >
-                <img
-                  :src="getFileAccessHttpUrl(item.courseCover)"
-                  height="25px"
-                  alt="封面不存在"
-                  style="width: 100%; height: 100%"
-                />
-              </router-link>
-              <router-link
-                v-if="item.showType == 2"
-                :to="{ name: 'teaching-mineCourse-courseUnitCard', query: { id: item.id } }"
-              >
-                <img
-                  :src="getFileAccessHttpUrl(item.courseCover)"
-                  height="25px"
-                  alt="封面不存在"
-                  style="width: 100%; height: 100%"
-                />
-              </router-link>
-            </div>
-          </a-card-meta>
-          <br />
-          <span v-html="item.courseDesc" class="article-content"></span>
-        </a-card>
-      </a-list-item>
-    </a-list>
+    <a-card v-for="item in dataSource" :key="item.id" :hoverable="true">
+      <!-- <template class="ant-card-extra" slot="extra">
+        <span class="create-time">{{item.createTime}}</span>
+      </template> -->
+      <a-card-meta>
+        <div style="margin-bottom: 3px" slot="title">
+          <a-icon type="info-circle" @click="toDetail(item)"/>
+          <a-divider type="vertical"></a-divider>
+          <span @click="toCourse(item.showType, item.id)">{{ item.courseName }}</span>
+        </div>
+        <div @click="toCourse(item.showType, item.id)" class="meta-cardInfo" slot="description">
+            <img
+              :src="getFileAccessHttpUrl(item.courseCover)"
+              height="25px"
+              style="width: 100%; height: 100%"
+            />
+        </div>
+      </a-card-meta>
+    </a-card>
+    <j-modal 
+      :visible="showCourseDetail" 
+      :title="currentCourse.courseName"
+      :width="800"
+      :footer="null"
+      @cancel="showCourseDetail=false"
+      >
+        <div v-html="currentCourse.courseDesc"></div>
+      </j-modal>
   </div>
 </template>
 <script>
@@ -49,6 +39,8 @@ export default {
   data() {
     return {
       dataSource: [],
+      showCourseDetail: false,
+      currentCourse: {}
     }
   },
   mounted() {
@@ -67,6 +59,17 @@ export default {
         this.loading = false
       })
     },
+    toCourse(showType, id){
+      if(showType == 1){
+        this.$router.push("/teaching/mineCourse/courseUnitMap?id="+id)
+      }else{
+        this.$router.push("/teaching/mineCourse/courseUnitCard?id="+id)
+      }
+    },
+    toDetail(item) {
+      this.showCourseDetail = true
+      this.currentCourse = item
+    },
   },
 }
 </script>
@@ -74,7 +77,11 @@ export default {
 <style lang="less" scoped>
 .app-list {
   .ant-card {
-    height: 350px;
+    min-height: 200px;
+    max-height: 400px;
+    width: 400px;
+    display: inline-block;
+    margin: 20px;
   }
   .meta-cardInfo {
     zoom: 1;

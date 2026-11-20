@@ -1,5 +1,6 @@
 package org.jeecg.modules.teaching.controller;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -13,23 +14,31 @@ import org.jeecg.common.api.vo.DictResult;
 import org.jeecg.common.api.vo.Result;
 import org.jeecg.common.aspect.annotation.AutoLog;
 import org.jeecg.common.aspect.annotation.PermissionData;
+import org.jeecg.common.constant.CacheConstant;
 import org.jeecg.common.system.query.QueryGenerator;
 import org.jeecg.common.system.vo.LoginUser;
 import org.jeecg.common.util.IPUtils;
 import org.jeecg.common.util.RedisUtil;
 import org.jeecg.common.util.oConvertUtils;
+import org.jeecg.config.QiniuConfig;
 import org.jeecg.modules.common.controller.BaseController;
+import org.jeecg.modules.common.util.Ow365Util;
+import org.jeecg.modules.common.util.QiniuUtil;
+import org.jeecg.modules.system.entity.SysFile;
+import org.jeecg.modules.system.entity.SysUser;
+import org.jeecg.modules.system.service.ISysDataLogService;
+import org.jeecg.modules.system.service.ISysDepartService;
 import org.jeecg.modules.system.service.ISysFileService;
 import org.jeecg.modules.system.service.ISysUserService;
+import org.jeecg.modules.teaching.entity.TeachingAdditionalWork;
 import org.jeecg.modules.teaching.entity.TeachingWork;
 import org.jeecg.modules.teaching.entity.TeachingWorkComment;
 import org.jeecg.modules.teaching.entity.TeachingWorkCorrect;
+import org.jeecg.modules.teaching.enums.DepartDayLogType;
 import org.jeecg.modules.teaching.model.AdditionalWorkModel;
 import org.jeecg.modules.teaching.model.StudentWorkModel;
 import org.jeecg.modules.teaching.model.WorkCommentModel;
-import org.jeecg.modules.teaching.service.ITeachingWorkCommentService;
-import org.jeecg.modules.teaching.service.ITeachingWorkCorrectService;
-import org.jeecg.modules.teaching.service.ITeachingWorkService;
+import org.jeecg.modules.teaching.service.*;
 import org.jeecg.modules.teaching.vo.StudentWorkSendVO;
 import org.jeecg.modules.teaching.vo.TeachingWorkPage;
 import org.jeecgframework.poi.excel.ExcelImportUtil;
@@ -72,9 +81,37 @@ public class TeachingWorkController extends BaseController {
 	@Autowired
 	private ISysUserService sysUserService;
 	@Autowired
+	private ISysDepartService sysDepartService;
+	@Autowired
+	private ISysDataLogService sysDataLogService;
+	@Autowired
 	private RedisUtil redisUtil;
+	@Autowired
+	private QiniuUtil qiniuUtil;
+	@Autowired
+	private Ow365Util ow365Util;
 	 @Autowired
 	 private ISysFileService sysFileService;
+	 @Autowired
+	 private ITeachingDepartDayLogService teachingDepartDayLogService;
+	 @Autowired
+	 private ITeachingAdditionalWorkService teachingAdditionalWorkService;
+	 @Autowired
+	 private ITeachingCourseUnitService teachingCourseUnitService;
+
+	 @GetMapping("userInfo")
+	 public Result<?> getUserInfo(@RequestParam String userId){
+		 SysUser user = sysUserService.getById(userId);
+		 if(user == null){
+			 return Result.error("参数错误");
+		 }
+		 Map<String, Object> userInfo = new HashMap<>();
+		 userInfo.put("realname", user.getRealname());
+		 userInfo.put("sex", user.getSex());
+		 userInfo.put("avatar", user.getAvatar());
+		 userInfo.put("school", user.getSchool());
+		 return Result.ok(userInfo);
+	 }
 
 	 /**
 	  * 我的作业分页列表查询
@@ -91,11 +128,26 @@ public class TeachingWorkController extends BaseController {
 												 @RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
 												 @RequestParam(name = "pageSize", defaultValue = "999") Integer pageSize,
 												 HttpServletRequest req) {
+		 String tag = teachingWork.getWorkTag();
+		 teachingWork.setWorkTag(null);
 		 teachingWork.setUserId(getCurrentUser().getId());
 		 Result<IPage<StudentWorkModel>> result = new Result<IPage<StudentWorkModel>>();
 		 QueryWrapper<StudentWorkModel> queryWrapper = QueryGenerator.initQueryWrapper(teachingWork, req.getParameterMap());
+		 queryWrapper.orderByDesc("teaching_work.create_time");
 //		 Page<TeachingWork> page = new Page<TeachingWork>(pageNo, pageSize);
-		 IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), queryWrapper);
+		 if (StringUtils.isNotBlank(tag)){
+			 String keyTag = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), tag);
+			 Set<Object> tagWorkIds = redisUtil.sGet(keyTag);
+			 queryWrapper.in(tagWorkIds!=null&&!tagWorkIds.isEmpty(),"teaching_work.id", tagWorkIds);
+		 }
+		 IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), queryWrapper, null);
+		 for (StudentWorkModel workModel: pageList.getRecords()){
+			 String key = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), workModel.getId());
+			 Object tagObj = redisUtil.get(key);
+			 if(tagObj!=null){
+				 workModel.setWorkTag((String) tagObj);
+			 }
+		 }
 		 return Result.ok(pageList);
 	 }
 
@@ -115,6 +167,23 @@ public class TeachingWorkController extends BaseController {
 		 DictResult<List<AdditionalWorkModel>> result = new DictResult<>();
 		 String userId = getCurrentUser().getId();
 		 List<AdditionalWorkModel> list = teachingWorkService.userAdditionalWork(userId, departId, submit, status);
+		 for (AdditionalWorkModel work : list) {
+			 if (StringUtils.isNotBlank(work.getMineWorkUrl())){
+				 SysFile file = sysFileService.getById(work.getMineWorkUrl());
+				 if (file != null && StringUtils.isNotBlank(file.getFilePath())){
+					 work.setMineWorkUrl(QiniuConfig.domain + "/" + file.getFilePath());
+				 }
+			 }
+			 if (StringUtils.isNotBlank(work.getMineWorkCover())){
+				 SysFile file = sysFileService.getById(work.getMineWorkCover());
+				 if (file != null && StringUtils.isNotBlank(file.getFilePath())){
+					 work.setMineWorkCover(QiniuConfig.domain + "/" + file.getFilePath());
+				 }
+			 }
+			 if(StringUtils.isNotBlank(work.getWorkDocumentUrl())){
+				 work.setWorkDocumentUrl(ow365Util.getFileUrlStr(work.getWorkDocumentUrl()));
+			 }
+		 }
 		 result.setResult(list);
 		 return result;
 	 }
@@ -122,15 +191,20 @@ public class TeachingWorkController extends BaseController {
 	 /**
 	  * 提交作业
 	  * @param teachingWork
+	  *
 	  * @return
 	  */
 	 @PostMapping(value = "/submit")
 	 public Result<TeachingWork> add(@RequestBody TeachingWork teachingWork) {
-		 teachingWork.setUserId(getCurrentUser().getId());
 		 Result<TeachingWork> result = new Result<TeachingWork>();
 		 try {
 			 List<TeachingWork> oldWorks = new ArrayList<>();
-			 if (isNotEmpty(teachingWork.getAdditionalId())) {
+			 if (isNotEmpty(teachingWork.getId())){
+				oldWorks = teachingWorkService.getBaseMapper().selectByMap(new HashMap<String, Object>() {{
+					put("user_id", getCurrentUser().getId());
+					put("id", teachingWork.getId());
+				}});
+			 }else if (isNotEmpty(teachingWork.getAdditionalId())) {
 				 oldWorks = teachingWorkService.getBaseMapper().selectByMap(new HashMap<String, Object>() {{
 					 put("user_id", getCurrentUser().getId());
 					 put("additional_id", teachingWork.getAdditionalId());
@@ -143,21 +217,45 @@ public class TeachingWorkController extends BaseController {
 			 }else{
 				 oldWorks = teachingWorkService.getBaseMapper().selectByMap(new HashMap<String, Object>(){{
 					 put("work_name", teachingWork.getWorkName());
-					 put("user_id", teachingWork.getUserId());
+					 put("user_id", getCurrentUser().getId());
 					 put("work_type", teachingWork.getWorkType());
 				 }});
 			 }
-			 if (oldWorks.size() > 0){
+			 teachingWork.setId(null);
+			 teachingWork.setUserId(getCurrentUser().getId());
+			 if (StringUtils.isNotBlank(teachingWork.getCourseId())){
+				 String departId = teachingCourseUnitService.getUserDepartIdByUnitId(getCurrentUser().getId(), teachingWork.getCourseId());
+				 teachingWork.setDepartId(departId);
+			 }
+			 if (!oldWorks.isEmpty()){
 				 teachingWork.setId(oldWorks.get(0).getId());
 				 teachingWork.setCreateTime(new Date());
-				 teachingWork.setUpdateTime(new Date());
+				 //teachingWork.setUpdateTime(new Date());
 				 result.setResult(teachingWork);
 				 result.success("更新成功！");
+				 //保留原作品的历史记录
+				 sysDataLogService.addDataLog("teaching_work", teachingWork.getId(), JSONObject.toJSONString(teachingWork));
 			 }else{
 				 result.setResult(teachingWork);
 				 result.success("添加成功！");
 			 }
 			 teachingWorkService.saveOrUpdate(teachingWork);
+
+			 //班级每日教学记录
+			 if (isNotEmpty(teachingWork.getAdditionalId()) && isNotEmpty(teachingWork.getDepartId())){
+				 String key = String.format("departLog:addiWorkSubmit:%s", teachingWork.getDepartId());
+				 if (!redisUtil.sHasKey(key, teachingWork.getId())) {
+					 redisUtil.sSet(key, teachingWork.getId());
+					 teachingDepartDayLogService.addLog(teachingWork.getDepartId(), DepartDayLogType.ADDITIONAL_WORK_SUBMIT_COUNT);
+				 }
+			 }
+			 if (isNotEmpty(teachingWork.getCourseId()) && isNotEmpty(teachingWork.getDepartId())){
+				 String key = String.format("departLog:courseWorkSubmit:%s", teachingWork.getDepartId());
+				 if (!redisUtil.sHasKey(key, teachingWork.getId())) {
+					 redisUtil.sSet(key, teachingWork.getId());
+					 teachingDepartDayLogService.addLog(teachingWork.getDepartId(), DepartDayLogType.COURSE_WORK_SUBMIT_COUNT);
+				 }
+			 }
 		 } catch (Exception e) {
 			 log.error(e.getMessage(),e);
 			 result.error500("系统内部错误");
@@ -195,6 +293,8 @@ public class TeachingWorkController extends BaseController {
 								   HttpServletRequest req) {
 //		QueryWrapper<TeachingWork> queryWrapper = QueryGenerator.initQueryWrapper(teachingWork, req.getParameterMap());
 		Page<TeachingWork> page = new Page<TeachingWork>(pageNo, pageSize);
+		String tag = studentWorkModel.getWorkTag();
+		studentWorkModel.setWorkTag(null);
 		QueryWrapper<StudentWorkModel> queryWrapper = new QueryWrapper<>();
 		queryWrapper.eq(null != studentWorkModel.getUsername(), "teaching_work.create_by", studentWorkModel.getUsername())
 				.like(null != studentWorkModel.getWorkName(), "work_name", studentWorkModel.getWorkName())
@@ -206,7 +306,27 @@ public class TeachingWorkController extends BaseController {
 		String updateTime_end = param.containsKey("teaching_work.updateTime_end")?param.get("teaching_work.updateTime_end")[0]:null;
 		queryWrapper.ge(null != updateTime_begin, "teaching_work.create_time", updateTime_begin).
 				le(null != updateTime_end, "teaching_work.create_time",updateTime_end);
-		IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), queryWrapper);
+		//非admin和dev角色，只显示自己管理的部门下的用户的作品
+		List<String> myDeptIds = new ArrayList<>();
+		if(!hasRole("admin") && !hasRole("dev")){
+			myDeptIds = sysDepartService.getMySubDepIdsByDepId(getCurrentUser().getDepartIds());
+			if (myDeptIds==null || myDeptIds.isEmpty()){
+				return Result.error("您没有负责的班级");
+			}
+		}
+		if (StringUtils.isNotBlank(tag)){
+			String keyTag = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), tag);
+			Set<Object> tagWorkIds = redisUtil.sGet(keyTag);
+			queryWrapper.in(tagWorkIds!=null&&!tagWorkIds.isEmpty(),"teaching_work.id", tagWorkIds);
+		}
+		IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), queryWrapper,myDeptIds);
+		for (StudentWorkModel workModel: pageList.getRecords()){
+			String key = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), workModel.getId());
+			Object tagObj = redisUtil.get(key);
+			if(tagObj!=null){
+				workModel.setWorkTag((String) tagObj);
+			}
+		}
 		return Result.ok(pageList);
 	}
 
@@ -214,7 +334,7 @@ public class TeachingWorkController extends BaseController {
 	public Result<?> greatWorkList(@RequestParam(name="pageNo", defaultValue="1") Integer pageNo,
 								   @RequestParam(name="pageSize", defaultValue="10") Integer pageSize){
 		IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), new QueryWrapper<StudentWorkModel>()
-				.eq("teaching_work.work_status", 2));
+				.eq("teaching_work.work_status", 2), null);
 		return Result.ok(pageList);
 	}
 
@@ -222,21 +342,19 @@ public class TeachingWorkController extends BaseController {
 	 @GetMapping("/starWork")
 	 public Result starWork(@RequestParam(name = "workId") String workId, HttpServletRequest request) {
 		 Result<TeachingWork> result = new Result<TeachingWork>();
-		 LoginUser sysUser = (LoginUser) SecurityUtils.getSubject().getPrincipal();
-		 String userId = sysUser == null ? null : sysUser.getId();
 		 TeachingWork teachingWork = teachingWorkService.getById(workId);
 		 if (teachingWork == null) {
 			 result.error500("未找到对作业");
 		 } else {
 			 String ip = IPUtils.getIpAddr(request);
-			 if (redisUtil.get("starWork-" + workId + userId + ip) == null) {
+			 if (redisUtil.get("starWork:" + workId + ip) == null) {
 				 if (Objects.nonNull(teachingWork.getStarNum())) {
 					 teachingWork.setStarNum(teachingWork.getStarNum() + 1);
 				 } else {
 					 teachingWork.setStarNum(1);
 				 }
 				 teachingWorkService.updateById(teachingWork);
-				 redisUtil.set("starWork-" + workId + userId + ip, "1");
+				 redisUtil.set("starWork:" + workId + ip, "1", 3600*24);
 				 result.setMessage("点赞成功");
 				 result.setSuccess(true);
 			 } else {
@@ -247,16 +365,19 @@ public class TeachingWorkController extends BaseController {
 		 return result;
 	 }
 
-	 //劲作排行 TODO 缓存1
-	 @ApiOperation(value = "劲作排行榜")
+	 //劲作排行 TODO 缓存
+	 @ApiOperation(value = "作品排行榜")
 	 @GetMapping(value = "/leaderboard")
 	 public Result<?> listLeaderboard(@RequestParam(name = "pageNo", defaultValue = "1") Integer pageNo,
 									  @RequestParam(name = "pageSize", defaultValue = "10") Integer pageSize,
 									  @RequestParam(required = false, defaultValue = "view") String orderBy, //排序
+									  @RequestParam(required = false) Integer workStatus, //状态
+									  @RequestParam(required = false) String userId, //用户ID
 									  HttpServletRequest request) {
 		 QueryWrapper<StudentWorkModel> queryWrapper = new QueryWrapper<StudentWorkModel>();
-		 queryWrapper.orderByDesc("teaching_work.star_num");
-		 queryWrapper.ge("teaching_work.work_status", 1);
+		 queryWrapper.ge("teaching_work.work_status", 3);
+		 queryWrapper.eq(StringUtils.isNotBlank(userId), "teaching_work.user_id", userId);
+		 queryWrapper.eq(workStatus!=null, "teaching_work.work_status", workStatus);
 		 switch (orderBy){
 			 case "view":
 				 queryWrapper.orderByDesc("teaching_work.view_num");
@@ -269,7 +390,7 @@ public class TeachingWorkController extends BaseController {
 				 break;
 		 }
 
-		 IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), queryWrapper);
+		 IPage<StudentWorkModel> pageList = teachingWorkService.listWorkModel(new Page<>(pageNo, pageSize), queryWrapper, null);
 		 return Result.ok(pageList);
 	 }
 
@@ -318,6 +439,60 @@ public class TeachingWorkController extends BaseController {
 		 teachingWorkCommentService.save(c);
 		 return Result.ok("评论成功");
 	 }
+
+	 // 获取全部的标签
+	 @GetMapping("getWorkTags")
+	 public Result<?> getWorkTags(){
+		 String keyUserTag = String.format(CacheConstant.USER_WORK_TAG, getCurrentUser().getId());
+		 Set<Object> tags =redisUtil.sGet(keyUserTag);
+		 return Result.ok(tags);
+	 }
+
+	//设置作品标签
+	@GetMapping("setWorkTag")
+	public Result<?> setWorkTag(@RequestParam String workId, @RequestParam String workTag){
+		TeachingWork teachingWork = teachingWorkService.getById(workId);
+		if (teachingWork == null) {
+			return Result.error("未找到对作业");
+		}
+		String keyId = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), workId);
+		String keyTag = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), workTag);
+		String keyUserTag = String.format(CacheConstant.USER_WORK_TAG, getCurrentUser().getId());
+		Object oldTag = redisUtil.get(keyId);
+		if (StringUtils.isNotBlank(workTag)){
+			redisUtil.set(keyId, workTag);
+			redisUtil.sSet(keyTag, workId);
+			redisUtil.sSet(keyUserTag, workTag);
+		}else{
+			redisUtil.del(keyId);
+		}
+
+		if (!workTag.equals(oldTag)){
+			keyTag = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), oldTag);
+			redisUtil.setRemove(keyTag, workId);
+//			if(redisUtil.sGetSetSize(keyTag) <= 0){
+//				redisUtil.setRemove(keyUserTag, oldTag);
+//			}
+		}
+
+		return Result.ok("标记成功");
+	}
+
+	//删除标签
+	@DeleteMapping("delWorkTag")
+	public Result delWorkTag(@RequestParam String tag, @RequestParam(defaultValue = "false") Boolean force){
+		//检查标签是否正在使用
+		if (!force){
+			String keyTag = String.format(CacheConstant.WORK_TAG, getCurrentUser().getId(), tag);
+			Set<Object> tagWorkIds = redisUtil.sGet(keyTag);
+			if (tagWorkIds != null && !tagWorkIds.isEmpty()) {
+				return Result.error("标签正在使用中,是否确认删除？");
+			}
+		}
+		String keyUserTag = String.format(CacheConstant.USER_WORK_TAG, getCurrentUser().getId());
+		redisUtil.setRemove(keyUserTag, tag);
+		return Result.ok();
+	}
 	
 	/**
 	 *   添加
@@ -352,6 +527,22 @@ public class TeachingWorkController extends BaseController {
 			return Result.error("未找到对应数据");
 		}
 		teachingWorkService.updateMain(teachingWork, teachingWorkPage.getTeachingWorkCorrectList(),teachingWorkPage.getTeachingWorkCommentList());
+		if (StringUtils.isNotBlank(teachingWork.getDepartId())){
+			if (StringUtils.isNotEmpty(teachingWork.getAdditionalId())){
+				String key = String.format("departLog:addiWorkCorrect:%s", teachingWork.getDepartId());
+				if (!redisUtil.sHasKey(key, teachingWork.getId())) {
+					redisUtil.sSet(key, teachingWork.getId());
+					teachingDepartDayLogService.addLog(teachingWork.getDepartId(), DepartDayLogType.ADDITIONAL_WORK_CORRECT_COUNT);
+				}
+			}
+			if (StringUtils.isNotEmpty(teachingWork.getCourseId())){
+				String key = String.format("departLog:courseWorkCorrect:%s", teachingWork.getDepartId());
+				if (!redisUtil.sHasKey(key, teachingWork.getId())) {
+					redisUtil.sSet(key, teachingWork.getId());
+					teachingDepartDayLogService.addLog(teachingWork.getDepartId(), DepartDayLogType.COURSE_WORK_CORRECT_COUNT);
+				}
+			}
+		}
 		return Result.ok("编辑成功!");
 	}
 	
@@ -470,8 +661,8 @@ public class TeachingWorkController extends BaseController {
           BeanUtils.copyProperties(main, vo);
           List<TeachingWorkCorrect> teachingWorkCorrectList = teachingWorkCorrectService.selectByMainId(main.getId());
           vo.setTeachingWorkCorrectList(teachingWorkCorrectList);
-          List<TeachingWorkComment> teachingWorkCommentList = teachingWorkCommentService.selectByMainId(main.getId());
-          vo.setTeachingWorkCommentList(teachingWorkCommentList);
+//          List<TeachingWorkComment> teachingWorkCommentList = teachingWorkCommentService.selectByMainId(main.getId());
+//          vo.setTeachingWorkCommentList(teachingWorkCommentList);
           pageList.add(vo);
       }
 

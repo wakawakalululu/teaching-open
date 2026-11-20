@@ -1,61 +1,22 @@
-#https://blog.csdn.net/sinat_19528249/article/details/99994464
-# Version 0.1
-# 基础镜像
-FROM centos:7
-# 维护者信息
-MAINTAINER kangxiaolin ksf@zgykkj.com
-VOLUME /tmp
-#自动安装依赖
-RUN  cd /etc/yum.repos.d/ \
-    && yum -y install wget \
-    && wget -O /etc/yum.repos.d/epel.repo http://mirrors.aliyun.com/repo/epel-7.repo \
-    && yum clean all \
-    && yum makecache \
-    && yum update -y \
-    &&  yum -y  install nginx  \
-    &&  yum -y  install  java-1.8.0-openjdk java-1.8.0-openjdk-devel  \
-    &&  yum -y  install redis    \
-#这里可以设置 域名
-# 可以送本地加载 使用ADD 也可以直接写
-   && echo "server {  \
-                       listen       81; \
-                       location ^~ /jeecg-boot { \
-                      proxy_pass              http://127.0.0.1:8080/jeecg-boot/; \
-                      proxy_set_header        Host 127.0.0.1; \
-                      proxy_set_header        X-Real-IP \$remote_addr; \
-                      proxy_set_header        X-Forwarded-For \$proxy_add_x_forwarded_for; \
-                  } \
-                  #解决Router(mode: 'history')模式下，刷新路由地址不能找到页面的问题 \
-                  location / { \
-                     root   /var/www/html/; \
-                      index  index.html index.htm; \
-                      if (!-e \$request_filename) { \
-                          rewrite ^(.*)\$ /index.html?s=\$1 last; \
-                          break; \
-                      } \
-                  } \
-                  access_log  /var/log/nginx/access.log ; \
-              } " > /etc/nginx/conf.d/default.conf  \
+FROM openjdk:8
 
- # 设置启动脚本
-     && touch /etc/init.d/start.sh \
-     && touch jeecgboot.log \
-     && chmod +x /etc/init.d/start.sh \
-     && echo "#!/bin/bash  " >> /etc/init.d/start.sh \
-     && echo "/usr/bin/redis-server  & " >> /etc/init.d/start.sh \
-     && echo "/usr/sbin/nginx  -c /etc/nginx/nginx.conf" >> /etc/init.d/start.sh \
-     && echo " java -jar /jeecgboot.jar   " >> /etc/init.d/start.sh \
-     &&  mkdir  -p  /var/www \
-     &&  mkdir -p /var/www/html
-# 前端迁移到系统文件中 默认是80端口 同级目录下的html地址
-ADD  ant-design-vue-jeecg/dist/ /var/www/html/
-# 拷贝相关的jar包
-ADD jeecg-boot/jeecg-boot-module-system/target/jeecg-boot-module-system-2.2.0.jar jeecgboot.jar
-EXPOSE  80  8080 81
-ENTRYPOINT /bin/sh -c   /etc/init.d/start.sh
+## 创建目录，并使用它作为工作目录
+RUN mkdir -p /teaching-open-api-server
+WORKDIR /teaching-open-api-server
+## 将后端项目的 Jar 文件，复制到镜像中
+COPY ./jeecg-boot-module-system/target/teaching-open-2.8.0.jar app.jar
+ADD ./jeecg-boot-module-system/src/main/resources/application.yml application.yml
+ADD ./jeecg-boot-module-system/src/main/resources/application-prod.yml application-prod.yml
+ADD ./jeecg-boot-module-system/src/main/resources/logback-spring.xml logback-spring.xml
 
-#启动脚本
-#docker rmi $(docker images | grep "^<none>" | awk "{print $3}") 删除<none>
+## 设置 TZ 时区
+ENV TZ=Asia/Shanghai
+## 设置 JAVA_OPTS 环境变量，可通过 docker run -e "JAVA_OPTS=" 进行覆盖
+ENV JAVA_OPTS="-Xms1024m -Xmx1024m -Djava.security.egd=file:/dev/./urandom"
 
-#docker build -t jeecgboot:centos .
-#docker run --privileged=true  -itd --name test -v /sys/fs/cgroup:/sys/fs/cgroup:ro  -p 81:81 -p 8080:8080 -p 82:80  jeecgboot:centos
+## 暴露后端项目的 8080 端口
+EXPOSE 8080
+
+## 启动后端项目
+CMD java ${JAVA_OPTS} -jar app.jar ${ARGS}
+

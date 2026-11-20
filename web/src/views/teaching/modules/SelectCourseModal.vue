@@ -16,14 +16,13 @@
           <a-row :gutter="24">
 
             <a-col :span="10">
-              <a-form-item label="账号">
+              <a-form-item label="课程名">
                 <a-input placeholder="请输入课程名" v-model="queryParam.courseName"></a-input>
               </a-form-item>
             </a-col>
             <a-col :span="8">
                     <span style="float: left;overflow: hidden;" class="table-page-search-submitButtons">
                       <a-button type="primary" @click="searchQuery" icon="search">查询</a-button>
-                      <a-button type="primary" @click="searchReset" icon="reload" style="margin-left: 8px">重置</a-button>
                     </span>
             </a-col>
 
@@ -86,12 +85,12 @@
             width: 100,
             dataIndex: 'courseName'
           },
-          {
-            title:'课程介绍',
-            align:"center",
-            width: 200,
-            dataIndex: 'courseDesc'
-          },
+          // {
+          //   title:'课程介绍',
+          //   align:"center",
+          //   width: 200,
+          //   dataIndex: 'courseDesc'
+          // },
           {
             title:'创建时间',
             align:"center",
@@ -146,14 +145,15 @@
       }
     },
     created() {
-      this.loadData();
+      // this.loadData();
     },
     methods: {
-      searchQuery() {
+      show(departId){
+        this.visible = true
+        this.queryParam.departId = departId
         this.loadData(1);
       },
-      searchReset() {
-        this.queryParam = {};
+      searchQuery() {
         this.loadData(1);
       },
       handleCancel() {

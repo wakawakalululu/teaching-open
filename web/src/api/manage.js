@@ -1,5 +1,7 @@
 import Vue from 'vue'
 import { axios } from '@/utils/request'
+import { SYS_CONFIG } from "@/store/mutation-types"
+import store from '../store/'
 
 const api = {
   user: '/api/user',
@@ -165,17 +167,57 @@ export function uploadAction(url,parameter){
  * @param subStr
  * @returns {*}
  */
-export function getFileAccessHttpUrl(avatar,subStr) {
+export function getFileAccessHttpUrl(path,subStr) {
   if(!subStr) subStr = 'http'
-  if(avatar && avatar.startsWith(subStr)){
-    return avatar;
+  if(path && path.startsWith(subStr)){
+    return path;
   }else{
-    if(avatar &&　avatar.length>0 && avatar.indexOf('[')==-1){
-      if(window._CONFIG['defaultUploadType'] == "qiniu"){
-        return window._CONFIG['qn_base'] + avatar;
+    if(path &&path.length>0 && path.indexOf('[')==-1){
+      if(store.getters.sysConfig.uploadType == "qiniu"){
+        return store.getters.sysConfig.qiniuDomain + '/' + path;
       }else{
-        return window._CONFIG['staticDomainURL'] + avatar;
+        return store.getters.sysConfig.staticDomain + '/' +  path;
       }
     }
   }
+}
+
+/**
+ * 获取文件预览
+ * @param path 
+ */
+export function getFilePrevew(path){
+  if(!path) return null
+  let ssl = ''
+  if(path.startsWith('aes:')){
+    path = path.slice(4)
+  }else if(path.startsWith('aess:')){
+    path = path.slice(5)
+    ssl = '&ssl=1'
+  }else if(!path.startsWith('http:') && !path.startsWith('https:')){
+    path = getFileAccessHttpUrl(path)
+  }
+  switch(store.getters.sysConfig.filePreview){
+    case 'ow365':
+      return `http://ow365.cn/?i=${store.getters.sysConfig.owId}${ssl}&n=5&furl=` + path
+    case 'officeapps':
+      return 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(path)
+    case 'kkfileview':
+      return  location.protocol + "//" + location.host + `:8012/preview/onlinePreview?url=` + encodeURIComponent(btoa(url))
+    default:
+      return path
+  }
+}
+
+//获取当前配置
+export function getSysConfig(){
+  return axios({
+      url: "/sys/config/getCurrentConfig"
+  })
+}
+//获取菜单
+export function getMenu(){
+  return axios({
+      url: "/teaching/menu/getUserMenu"
+  })
 }

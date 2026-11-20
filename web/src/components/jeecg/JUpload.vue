@@ -43,9 +43,8 @@
 <script>
 
   import Vue from 'vue'
-  import { ACCESS_TOKEN } from "@/store/mutation-types"
+  import { ACCESS_TOKEN,SYS_CONFIG } from "@/store/mutation-types"
   import {getAction , postAction, deleteAction} from "@/api/manage"
-
   const FILE_TYPE_ALL = "all"
   const FILE_TYPE_IMG = "image"
   const FILE_TYPE_TXT = "file"
@@ -84,12 +83,12 @@
       return {
         urlDownload: "",
         downloadUrl:{
-          local: window._CONFIG['domianURL'] + "/sys/common/static/",
-          qiniu: window._CONFIG['qn_base']
+          local: this.$store.getters.sysConfig.staticDomain + '/',
+          qiniu: this.$store.getters.sysConfig.qiniuDomain + '/'
         },
         uploadAction:{
-          local: window._CONFIG['domianURL']+"/sys/common/upload",
-          qiniu: "//upload-"+window._CONFIG['qn_area']+".qiniup.com",
+          local: window._CONFIG['domianURL'] + "/sys/common/upload",
+          qiniu: "//upload-" + this.$store.getters.sysConfig.qiniuArea + ".qiniup.com",
           oss: "",
           cos: ""
         },
@@ -99,7 +98,7 @@
         headers:{},
         fileList: [],
         uploadToken: '',
-        uploadKey: '',
+        uploadKey: {},
         newFileList: [],
         uploadGoOn:true,
         previewVisible: false,
@@ -149,7 +148,7 @@
       uploadTarget:{
         type: String,
         required: false,
-        default:window._CONFIG['defaultUploadType'] || UPLOAD_TARGET_LOCAL
+        default: Vue.ls.get(SYS_CONFIG).uploadType
       },
       /*这个属性用于控制文件上传的业务路径*/
       bizPath:{
@@ -231,12 +230,6 @@
     created(){
       const token = Vue.ls.get(ACCESS_TOKEN);
       this.headers = {"X-Access-Token":token}
-      // switch(this.uploadTarget){
-      //     case UPLOAD_TARGET_QINIU:
-      //       this.getQiniuToken();
-      //       break;
-      //     default:
-      //   }
       //---------------------------- begin 图片左右换位置 -------------------------------------
       this.containerId = 'container-ty-'+new Date().getTime();
       //---------------------------- end 图片左右换位置 -------------------------------------
@@ -247,19 +240,23 @@
       getUploadAction(){
         switch(this.uploadTarget){
           case UPLOAD_TARGET_LOCAL:
+            console.log(this.uploadAction.local);
             return this.uploadAction.local;
           case UPLOAD_TARGET_QINIU:
+            console.log(this.uploadAction.qiniu);
             return this.uploadAction.qiniu;
           case UPLOAD_TARGET_OSS:
             return this.uploadAction.oss;
           case UPLOAD_TARGET_COS:
             return this.uploadAction.cos;
           default:
-              return this.uploadAction.local
+            return this.uploadAction.local
         }
       },
       //获取下载链接
       getDownloadUrl(key){
+        console.log(key);
+        console.log(this.uploadTarget);
         switch(this.uploadTarget){
           case UPLOAD_TARGET_LOCAL:
             return this.downloadUrl.local + key;
@@ -270,23 +267,22 @@
           case UPLOAD_TARGET_COS:
             return this.downloadUrl.cos + key;
           default:
-              return this.uploadAction.local + key;
+            return this.uploadAction.local + key;
         }
       },
       //获取要上传数据
       getUploadData(file){
-        console.log("getUploadData");
         switch(this.uploadTarget){
           case UPLOAD_TARGET_LOCAL:
             return {'isup':1,'bizPath':this.bizPath};
           case UPLOAD_TARGET_QINIU:
-            return {'token': this.uploadToken, 'key': this.uploadKey};
+            return {'token': this.uploadToken, 'key': this.uploadKey[file.uid]};
           case UPLOAD_TARGET_OSS:
             return {};
           case UPLOAD_TARGET_COS:
             return {};
           default:
-              return {'isup':1,'bizPath':this.bizPath};
+            return {'isup':1,'bizPath':this.bizPath};
         } 
       },
       //获取七牛TOKEN
@@ -363,6 +359,7 @@
         for(var a=0;a<arr.length;a++){
           // let url = getFileAccessHttpUrl(arr[a]);
           let url = this.getDownloadUrl(arr[a]);
+          console.log(url);
           fileList.push({
             uid:uidGenerator(),
             name:getFileName(arr[a]),
@@ -404,7 +401,7 @@
       beforeUpload(file){
         this.uploadGoOn=true
         var fileType = file.type;
-        console.log("file type :" + fileType);
+        
         if(this.fileType===FILE_TYPE_IMG){
           if(fileType.indexOf('image')<0){
             this.$message.warning('请上传图片');
@@ -419,9 +416,8 @@
         //获取文件key
         let suffix = file.name.split(".")
         if(suffix.length>1){suffix = suffix.pop()}else{suffix = ""}
-        this.uploadKey = this.getFileFullName(suffix)
-        this.$emit("selected", this.uploadKey, file);
-
+        this.uploadKey[file.uid] = this.getFileFullName(suffix)
+        this.$emit("selected", this.uploadKey[file.uid], file);
         //获取上传token
         switch(this.uploadTarget){
           case UPLOAD_TARGET_QINIU:

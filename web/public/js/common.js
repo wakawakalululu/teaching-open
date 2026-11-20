@@ -1,7 +1,10 @@
-window.urlParams = function(paramName) {
+window.version = 'TO2.8'
+window.urlParams = function (paramName) {
   var reg = new RegExp('[?&]' + paramName + '=([^&]*)[&]?', 'i')
   var paramVal = window.location.search.match(reg)
-  return paramVal == null ? '' : decodeURIComponent(paramVal[1])
+  if(paramVal == null) return ''
+  var param = paramVal[1].replace(/%/g,'%25');
+  return decodeURIComponent(param)
 }
 
 window.uuid = function() {
@@ -20,25 +23,53 @@ window.uuid = function() {
 
 window.getUserInfo = function() {
   userInfo = localStorage.getItem('pro__Login_Userinfo')
-  if(userInfo){
-    userInfo = JSON.parse(userInfo).value
-    console.log(userInfo)
-    return userInfo
-  }
+  if(!userInfo){ return {};}
+  userInfo = JSON.parse(userInfo).value
+  return userInfo
 }
 
 window.getUserRole = function(){
   userRole = localStorage.getItem('pro__Login_UserRole')
-  if(userRole){
-    userRole = JSON.parse(userRole).value
-    console.log(userRole)
-    return userRole
-  }
+  if(!userRole){return {};}
+  userRole = JSON.parse(userRole).value
+  return userRole
 }
 
 window.getUserToken = function() {
+  if(!localStorage.getItem("pro__Access-Token")) return null;
   var token = JSON.parse(localStorage.getItem("pro__Access-Token"))
   return token==null?null:token.value
+}
+
+window.getSysConfig = function(key){
+  if(localStorage.getItem("pro__SYS_CONFIG") && JSON.parse(localStorage.getItem("pro__SYS_CONFIG")).value){
+    return JSON.parse(localStorage.getItem("pro__SYS_CONFIG")).value[key]
+  }else{
+    let config = null
+    $.ajax({
+      url: '/api/sys/config/getCurrentConfig',
+      async: false,
+      success: function(res){
+        if(res.code == 0){
+          config = res.result
+          let configCache = {
+            expire: new Date().getTime()+3600000,
+            value: config
+          }
+          localStorage.setItem("pro__SYS_CONFIG", JSON.stringify(configCache))
+        }
+      }
+    })
+    return config
+  }
+}
+
+window.getLogo = function(){
+  if(getSysConfig('uploadType') == "qiniu"){
+    return getSysConfig('qiniuDomain') + "/" + getSysConfig('logo')
+  }else{
+    return getSysConfig('staticDomain') + "/" + getSysConfig('logo')
+  }
 }
 
 window.getWorkInfo = function(workId, cb) {
@@ -75,10 +106,10 @@ window.getScratchAssets = function(assetType, cb){
   return data
 }
 
-window.getQiniuToken = function() {
+window.getQiniuToken = function(onSuccess, onError) {
   var qn_token;
   $.ajax({
-    url: '/api/common/qiniu/getToken',
+    url: '/api/common/qiniu/getToken?t=' + new Date().getTime(),
     beforeSend: function(request) {
       request.setRequestHeader('X-Access-Token', getUserToken())
     },
@@ -87,16 +118,17 @@ window.getQiniuToken = function() {
       console.log(res)
       if (res.code == 200) {
         qn_token = res.result
+        if (onSuccess) {
+          onSuccess(res)
+        }
       } else {
         //alert(res.message)
       }
     },
     error: function(e) {
-      if (e.responseJSON.status == 500) {
-        //alert(e.responseJSON.message);
-        location.href = '/'
+      if (onError) {
+        onError(e)
       }
-      console.log(e)
     }
   });
   return qn_token;
@@ -162,7 +194,7 @@ window.getQiniuToken = function() {
   function upload2Qiniu(file, key, fileName, observer) {
     var config = {
       useCdnDomain: true,
-      region: qiniu.region[JSON.parse(localStorage.getItem("CONFIG")).qn_area],
+      region: qiniu.region[getSysConfig('qiniuArea')],
       disableStatisticsReport: true
     }
     var putExtra = {
@@ -228,10 +260,10 @@ function getFileAccessHttpUrl(avatar,subStr) {
     return avatar;
   }else{
     if(avatar &&　avatar.length>0 && avatar.indexOf('[')==-1){
-      if(JSON.parse(localStorage.getItem("CONFIG")).defaultUploadType == "qiniu"){
-        return JSON.parse(localStorage.getItem("CONFIG")).qn_base + avatar;
+      if(getSysConfig('uploadType') == "qiniu"){
+        return getSysConfig('qiniuDomain') + '/' + avatar;
       }else{
-        return JSON.parse(localStorage.getItem("CONFIG")).staticDomainURL + avatar;
+        return getSysConfig('staticDomain') + '/' + avatar;
       }
     }
   }
@@ -269,17 +301,4 @@ window.isFullscreen = function(){
          document.webkitFullscreenElement || false;
 }
 
-console.log("Teacing Open v2.6");
-
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', 'UA-155190299-2');
-
-var _hmt = _hmt || [];
-(function() {
-  var hm = document.createElement("script");
-  hm.src = "https://hm.baidu.com/hm.js?5701500c2c4326d51b2652ee8426452e";
-  var s = document.getElementsByTagName("script")[0]; 
-  s.parentNode.insertBefore(hm, s);
-})();
+console.log("Teaching Open v2.8");

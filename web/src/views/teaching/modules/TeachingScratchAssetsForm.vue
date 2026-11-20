@@ -5,14 +5,12 @@
         <a-row>
           <a-col :span="24">
             <a-form-item label="素材类型" :labelCol="labelCol" :wrapperCol="wrapperCol">
-              <j-dict-select-tag
-                type="list"
-                v-decorator="['assetType', validatorRules.assetType]"
-                @change="assetTypeChange"
-                :trigger-change="true"
-                dictCode="scratch_asset_type"
-                placeholder="请选择素材类型"
-              />
+              <a-select v-decorator="['assetType', validatorRules.assetType]" @change="assetTypeChange">
+                <a-select-option :value="1">背景</a-select-option>
+                <a-select-option :value="2">声音</a-select-option>
+                <a-select-option :value="3">造型</a-select-option>
+                <a-select-option :value="4">角色</a-select-option>
+              </a-select>
             </a-form-item>
           </a-col>
           <div v-if="model.assetType !== undefined">
@@ -39,7 +37,7 @@
                       v-model="costumFile"
                       @selected="selectedCostume"
                       @delete="onCostumeDelete"
-                      
+                      :multiple="true"
                       :uploadPath="assetPrefix"
                       fileType="image"
                       :number="99"
@@ -51,7 +49,7 @@
                       v-model="soundFile"
                       @selected="selectedSound"
                       @delete="onSoundDelete"
-                      
+                      :multiple="true"
                       :uploadPath="assetPrefix"
                       :number="99"
                       :trigger-change="true"
@@ -171,7 +169,7 @@ export default {
         queryById: '/teaching/teachingScratchAssets/queryById'
       },
       scratchTagCode: '',
-      assetPrefix: '/internalapi/asset/',
+      assetPrefix: 'internalapi/asset/',
 
       costumFile: '',
       soundFile: '',

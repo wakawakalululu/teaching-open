@@ -5,12 +5,13 @@
         :activeKey="customActiveKey"
         :tabBarStyle="{ textAlign: 'center', borderBottom: 'unset' }"
         @change="handleTabClick">
-        <a-tab-pane key="tab1" tab="账号密码登陆">
+        <a-tab-pane key="tab1" tab="账号密码登录">
           <a-form-item>
             <a-input
               size="large"
               v-decorator="['username',{initialValue:'', rules: validatorRules.username.rules}]"
               type="text"
+              autocomplete="off"
               placeholder="请输入帐户名">
               <a-icon slot="prefix" type="user" :style="{ color: 'rgba(0,0,0,.25)' }"/>
             </a-input>
@@ -21,7 +22,7 @@
               v-decorator="['password',{initialValue:'', rules: validatorRules.password.rules}]"
               size="large"
               type="password"
-              autocomplete="false"
+              autocomplete="off"
               placeholder="密码">
               <a-icon slot="prefix" type="lock" :style="{ color: 'rgba(0,0,0,.25)' }"/>
             </a-input>
@@ -88,7 +89,7 @@
         <router-link :to="{ name: 'alteration'}" class="forge-password" style="float: right;">
           忘记密码
         </router-link>
-       <router-link :to="{ name: 'register'}" class="forge-password" style="float: right;margin-right: 10px" >
+       <router-link v-if="$store.getters.sysConfig.allowReg=='1'" :to="{ name: 'register'}" class="forge-password" style="float: right;margin-right: 10px" >
           注册账户
         </router-link>
       </a-form-item>
@@ -105,11 +106,8 @@
         </a-button>
       </a-form-item>
 
-      <div v-if="false" class="user-login-other">
-        <span>其他登陆方式</span>
-        <a @click="onThirdLogin('github')" title="github"><a-icon class="item-icon" type="github"></a-icon></a>
-        <a @click="onThirdLogin('wechat_enterprise')" title="企业微信"><a-icon class="item-icon" type="wechat"></a-icon></a>
-        <a @click="onThirdLogin('dingtalk')" title="钉钉"><a-icon class="item-icon" type="dingding"></a-icon></a>
+      <div>
+        <a href="/">返回首页</a>
       </div>
     </a-form>
 
@@ -525,29 +523,6 @@
       font-size: 16px;
       height: 40px;
       width: 100%;
-    }
-
-    .user-login-other {
-      text-align: left;
-      margin-top: 24px;
-      line-height: 22px;
-
-      .item-icon {
-        font-size: 24px;
-        color: rgba(0,0,0,.2);
-        margin-left: 16px;
-        vertical-align: middle;
-        cursor: pointer;
-        transition: color .3s;
-
-        &:hover {
-          color: #1890ff;
-        }
-      }
-
-      .register {
-        float: right;
-      }
     }
   }
 

@@ -3,25 +3,17 @@
     <div class="container">
       <div class="top">
         <div class="header">
-          <a href="/">
-            <img src="/logo.png" class="logo" alt="logo">
-            <span class="title">{{brandName}}</span>
-          </a>
+          <img :src="logo" class="logo" alt="logo">
+          <h3 class="title">{{brandName}}</h3>
         </div>
         <div class="desc">
-          {{brandName}}教学平台
+          {{brandDesc}}
         </div>
       </div>
 
       <route-view></route-view>
 
-      <div class="footer">
-        <div class="links">
-          <a href="http://github.com/open-scratch/teaching" target="_blank">帮助</a>
-        </div>
-        <div class="copyright">
-          Copyright &copy; 2019 <a href="http://github.com/open-scratch" target="_blank">Scratch开源社区</a> 出品
-        </div>
+      <div class="footer" v-html="$store.getters.sysConfig.footer">
       </div>
     </div>
   </div>
@@ -30,14 +22,21 @@
 <script>
   import RouteView from "@/components/layouts/RouteView"
   import { mixinDevice } from '@/utils/mixin.js'
-
+  import { getFileAccessHttpUrl } from '@/api/manage'
   export default {
     name: "UserLayout",
     components: { RouteView },
     mixins: [mixinDevice],
     data () {
       return {
-         brandName: window._CONFIG['brandName']
+         brandName: this.$store.getters.sysConfig.brandName,
+         brandDesc: this.$store.getters.sysConfig.brandDesc,
+         logo: '/logo.png'
+      }
+    },
+    created() {
+      if(this.$store.getters.sysConfig.logo){
+        this.logo = getFileAccessHttpUrl(this.$store.getters.sysConfig.logo)
       }
     },
     mounted () {
@@ -67,7 +66,7 @@
       min-height: 100%;
       background: #f0f2f5 url(~@/assets/background.svg) no-repeat 50%;
       background-size: 100%;
-      padding: 110px 0 144px;
+      padding: 50px 0 44px;
       position: relative;
 
       a {
@@ -78,21 +77,11 @@
         text-align: center;
 
         .header {
-          height: 44px;
+          max-height: 144px;
           line-height: 44px;
 
-          .badge {
-            position: absolute;
-            display: inline-block;
-            line-height: 1;
-            vertical-align: middle;
-            margin-left: -12px;
-            margin-top: -10px;
-            opacity: 0.8;
-          }
-
           .logo {
-            height: 44px;
+            max-height: 88px;
             vertical-align: top;
             margin-right: 16px;
             border-style: none;
@@ -118,7 +107,7 @@
       .main {
         min-width: 260px;
         width: 368px;
-        margin: 0 auto;
+        margin: 0 auto 60px;
       }
 
       .footer {
