@@ -17,6 +17,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/entity"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/passwd"
+	"github.com/wakawakalululu/teaching-open/goframe-server/internal/service/rbac"
 )
 
 // 登录错误（对外统一话术，不区分账号不存在与密码错误）。
@@ -217,23 +218,10 @@ func (s *Service) getByID(ctx context.Context, id string) (*entity.SysUser, erro
 
 // ListRoles 查询用户的角色编码。
 //
-// 注意：sys_role 表没有 del_flag 字段（已核对 teachingopen2.6.sql 结构），
-// 不能加 r.del_flag 过滤，否则会因未知列直接 SQL 报错。
+// SQL 实现统一收敛在 service/rbac（管理类用例同样需要角色校验），
+// 此处仅做转发；sys_role 无 del_flag 列的注意事项见 rbac 包说明。
 func (s *Service) ListRoles(ctx context.Context, userID string) ([]string, error) {
-	var (
-		codes []string
-		err   error
-	)
-	err = dao.SysUser.DB().Model("sys_user_role ur").
-		InnerJoin("sys_role r", "r.id = ur.role_id").
-		Fields("r.role_code").
-		Where("ur.user_id", userID).
-		Ctx(ctx).
-		Scan(&codes)
-	if err != nil {
-		return nil, err
-	}
-	return codes, nil
+	return rbac.ListRoles(ctx, userID)
 }
 
 // hashSubject 对用户名做不可逆摘要，避免明文写入 Redis 键名。

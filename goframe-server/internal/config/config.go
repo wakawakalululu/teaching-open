@@ -22,6 +22,7 @@ type Config struct {
 	JWT       JWTConfig
 	Security  SecurityConfig
 	Storage   StorageConfig
+	Site      SiteConfig
 	Logistics LogisticsConfig
 }
 
@@ -61,6 +62,19 @@ type StorageConfig struct {
 	Driver     string
 	LocalRoot  string
 	PublicBase string
+}
+
+// SiteConfig 前端站点展示参数（/sys/config/getCurrentConfig 契约字段，
+// 来源对齐 Java application.yml 的 jeecg.uploadType/jeecg.path.staticDomain 等配置）。
+type SiteConfig struct {
+	// UploadType 上传方式（local/qiniu/...）。
+	UploadType string
+	// StaticDomain 静态资源域名。
+	StaticDomain string
+	// FilePreview 文件预览方式（空或 ow365）。
+	FilePreview string
+	// OwID ow365 预览应用 id（FilePreview=ow365 时输出到前端）。
+	OwID string
 }
 
 // LogisticsConfig 运行环境标识。
@@ -110,6 +124,11 @@ func Load() (*Config, error) {
 	cfg.Storage.Driver = env("STORAGE_DRIVER", "local")
 	cfg.Storage.LocalRoot = env("STORAGE_LOCAL_ROOT", "./data/upload")
 	cfg.Storage.PublicBase = env("STORAGE_PUBLIC_BASE", "/api/sys/common/static")
+
+	cfg.Site.UploadType = env("UPLOAD_TYPE", "local")
+	cfg.Site.StaticDomain = env("STATIC_DOMAIN", "")
+	cfg.Site.FilePreview = env("FILE_PREVIEW", "")
+	cfg.Site.OwID = env("OW365_ID", "")
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err

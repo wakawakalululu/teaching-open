@@ -12,9 +12,15 @@ import (
 
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/auth"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/config"
+	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
+	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
+	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
+	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
+	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
+	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
 )
 
@@ -85,6 +91,15 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	feishu := notify.NewFeishu(cfg.Security.FeishuWebhook)
 	loginSvc := svcLogin.New(tokens, limiter, feishu)
 	loginCtrl := ctrlLogin.New(loginSvc)
+	// P0-1 业务域：字典 / 分类 / 站点配置
+	dictCtrl := ctrlDict.New(svcDict.New())
+	categoryCtrl := ctrlCategory.New(svcCategory.New())
+	configCtrl := ctrlConfig.New(svcConfig.New(svcConfig.SiteOptions{
+		UploadType:   cfg.Site.UploadType,
+		StaticDomain: cfg.Site.StaticDomain,
+		FilePreview:  cfg.Site.FilePreview,
+		OwID:         cfg.Site.OwID,
+	}))
 
 	// 2.1 数据库连接自检（带病启动则直接失败）
 	if err := g.DB().PingMaster(); err != nil {
@@ -121,6 +136,11 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/login", loginCtrl.Login)
 		group.POST("/mLogin", loginCtrl.Login)
 		group.POST("/refreshToken", loginCtrl.Refresh)
+		// 与 Java Shiro anon 名单对齐的公开读接口（登录页/未登录页面也会调用）：
+		// /sys/dict/getDictItems/**、/sys/config/getCurrentConfig、/sys/config/getConfig
+		group.GET("/dict/getDictItems/:dictCode", dictCtrl.GetDictItems)
+		group.GET("/config/getCurrentConfig", configCtrl.GetCurrentConfig)
+		group.GET("/config/getConfig", configCtrl.GetConfig)
 	})
 
 	// 受保护路由
@@ -131,6 +151,51 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		// 密码管理：自助改密（校验旧密码）与管理员重置（服务层校验 admin 角色）
 		group.PUT("/sys/user/updatePassword", loginCtrl.UpdatePassword)
 		group.PUT("/sys/user/changePassword", loginCtrl.ChangePassword)
+
+		// 字典域（P0-1）
+		group.GET("/sys/dict/queryAllDictItems", dictCtrl.QueryAllDictItems)
+		group.GET("/sys/dict/getDictText/:dictCode/:key", dictCtrl.GetDictText)
+		group.GET("/sys/dict/loadDict/:dictCode", dictCtrl.LoadDict)
+		group.GET("/sys/dict/loadDictItem/:dictCode", dictCtrl.LoadDictItem)
+		group.GET("/sys/dict/list", dictCtrl.List)
+		group.GET("/sys/dict/treeList", dictCtrl.TreeList)
+		group.GET("/sys/dict/getByCode", dictCtrl.GetByCode)
+		group.GET("/sys/dict/deleteList", dictCtrl.DeleteList)
+		group.GET("/sys/dict/refleshCache", dictCtrl.RefleshCache)
+		group.POST("/sys/dict/add", dictCtrl.Add)
+		group.PUT("/sys/dict/edit", dictCtrl.Edit)
+		group.DELETE("/sys/dict/delete", dictCtrl.Delete)
+		group.DELETE("/sys/dict/deleteBatch", dictCtrl.DeleteBatch)
+		group.DELETE("/sys/dict/deletePhysic/:id", dictCtrl.DeletePhysic)
+		group.PUT("/sys/dict/back/:id", dictCtrl.Back)
+
+		// 字典项域（P0-1）
+		group.GET("/sys/dictItem/list", dictCtrl.ItemList)
+		group.POST("/sys/dictItem/add", dictCtrl.ItemAdd)
+		group.PUT("/sys/dictItem/edit", dictCtrl.ItemEdit)
+		group.DELETE("/sys/dictItem/delete", dictCtrl.ItemDelete)
+		group.DELETE("/sys/dictItem/deleteBatch", dictCtrl.ItemDeleteBatch)
+
+		// 分类字典域（P0-1）
+		group.GET("/sys/category/rootList", categoryCtrl.RootList)
+		group.GET("/sys/category/childList", categoryCtrl.ChildList)
+		group.GET("/sys/category/queryById", categoryCtrl.QueryById)
+		group.GET("/sys/category/loadOne", categoryCtrl.LoadOne)
+		group.GET("/sys/category/loadTreeChildren", categoryCtrl.LoadTreeChildren)
+		group.GET("/sys/category/loadTreeRoot", categoryCtrl.LoadTreeRoot)
+		group.GET("/sys/category/loadDictItem", categoryCtrl.LoadDictItem)
+		group.GET("/sys/category/loadAllData", categoryCtrl.LoadAllData)
+		group.GET("/sys/category/checkCode", categoryCtrl.CheckCode)
+		group.GET("/sys/category/loadTreeData", categoryCtrl.LoadTreeData)
+		group.POST("/sys/category/add", categoryCtrl.Add)
+		group.PUT("/sys/category/edit", categoryCtrl.Edit)
+		group.DELETE("/sys/category/delete", categoryCtrl.Delete)
+		group.DELETE("/sys/category/deleteBatch", categoryCtrl.DeleteBatch)
+
+		// 站点配置域（P0-1）
+		group.GET("/sys/config/getAllConfigList", configCtrl.GetAllConfigList)
+		group.GET("/sys/config/getAllConfigMap", configCtrl.GetAllConfigMap)
+		group.POST("/sys/config/saveTenantConfig", configCtrl.SaveTenantConfig)
 	})
 
 	verifyRouteGuards()
@@ -159,6 +224,25 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/logout", true)
 	registerGuard("PUT", "/api/sys/user/updatePassword", true)
 	registerGuard("PUT", "/api/sys/user/changePassword", true)
+	// 字典域（P0-1）
+	registerGuard("POST", "/api/sys/dict/add", true)
+	registerGuard("PUT", "/api/sys/dict/edit", true)
+	registerGuard("DELETE", "/api/sys/dict/delete", true)
+	registerGuard("DELETE", "/api/sys/dict/deleteBatch", true)
+	registerGuard("DELETE", "/api/sys/dict/deletePhysic/:id", true)
+	registerGuard("PUT", "/api/sys/dict/back/:id", true)
+	// 字典项域（P0-1）
+	registerGuard("POST", "/api/sys/dictItem/add", true)
+	registerGuard("PUT", "/api/sys/dictItem/edit", true)
+	registerGuard("DELETE", "/api/sys/dictItem/delete", true)
+	registerGuard("DELETE", "/api/sys/dictItem/deleteBatch", true)
+	// 分类字典域（P0-1）
+	registerGuard("POST", "/api/sys/category/add", true)
+	registerGuard("PUT", "/api/sys/category/edit", true)
+	registerGuard("DELETE", "/api/sys/category/delete", true)
+	registerGuard("DELETE", "/api/sys/category/deleteBatch", true)
+	// 站点配置域（P0-1）
+	registerGuard("POST", "/api/sys/config/saveTenantConfig", true)
 
 	for _, rt := range guardedRoutes {
 		if !isMutating(rt.method) {

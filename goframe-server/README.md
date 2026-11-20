@@ -96,6 +96,29 @@ go run .
 | POST | `/api/sys/logout` | 登出（吊销令牌） | 是 |
 | PUT | `/api/sys/user/updatePassword` | 自助改密（校验旧密码，仅本人） | 是 |
 | PUT | `/api/sys/user/changePassword` | 管理员重置他人密码（需 admin 角色） | 是 |
+| GET | `/api/sys/dict/queryAllDictItems` | 全量字典（登录后前端初始化强依赖） | 是 |
+| GET | `/api/sys/dict/getDictItems/{dictCode}` | 按字典 Code 取字典项（普通/表字典二态） | 否（对齐 Shiro anon） |
+| GET | `/api/sys/dict/getDictText/{dictCode}/{key}` | 按键值取字典文本 | 是 |
+| GET | `/api/sys/dict/loadDict/{dictCode}?keyword=` | 表字典异步搜索 | 是 |
+| GET | `/api/sys/dict/loadDictItem/{dictCode}?key=` | 表字典回显 | 是 |
+| GET | `/api/sys/dict/list` / `treeList` / `getByCode` / `deleteList` | 字典管理页查询 | 是 |
+| POST/PUT/DELETE | `/api/sys/dict/add` / `edit` / `delete` / `deleteBatch` | 字典增改删（del_flag 软删 + 回收站） | 是 |
+| DELETE | `/api/sys/dict/deletePhysic/{id}` | 物理删除字典并级联清理字典项 | 是 |
+| PUT | `/api/sys/dict/back/{id}` | 回收站恢复 | 是 |
+| GET | `/api/sys/dict/refleshCache` | 刷新字典缓存（Go 版直查库，兼容占位） | 是 |
+| GET | `/api/sys/dictItem/list` | 字典项分页（sort_order 升序） | 是 |
+| POST/PUT/DELETE | `/api/sys/dictItem/add` / `edit` / `delete` / `deleteBatch` | 字典项管理 | 是 |
+| GET | `/api/sys/category/rootList` / `childList` / `queryById` | 分类字典查询 | 是 |
+| GET | `/api/sys/category/loadOne` / `loadTreeChildren` / `loadTreeRoot` / `loadDictItem` / `loadAllData` / `loadTreeData` / `checkCode` | 分类树加载与回显（列名白名单校验） | 是 |
+| POST/PUT/DELETE | `/api/sys/category/add` / `edit` / `delete` / `deleteBatch` | 分类增改删（服务端生成 YouBian 流水码） | 是 |
+| GET | `/api/sys/config/getConfig?key=` | 按键取配置 | 否（对齐 Shiro anon） |
+| GET | `/api/sys/config/getCurrentConfig` | 对外公开配置（登录页加载） | 否（对齐 Shiro anon） |
+| GET | `/api/sys/config/getAllConfigList` / `getAllConfigMap` | 配置管理页查询 | 是 |
+| POST | `/api/sys/config/saveTenantConfig` | 保存租户配置（需 admin 角色，逐键 upsert） | 是 |
+
+> P0-1 域（字典/分类/配置）契约对齐 Java V2.8 Controller。暂未迁移：Excel
+> 导入导出（`exportXls`/`importExcel`）、带过滤条件的表字典（4 段式 dictCode，
+> Java 版为原始 SQL 片段拼接，Go 版明确拒绝）。
 
 ### 运维工具（`tools/`）
 
@@ -109,7 +132,8 @@ go run .
 ## 安全要点
 
 1. **默认拒绝鉴权**：所有写操作路由必须显式声明认证，否则启动自检 `panic`。
-2. **占位符绑定防注入**：全部 gdb 占位符，表名/列名为常量。
+2. **占位符绑定防注入**：全部 gdb 占位符；表字典的动态表名/列名经
+   `^[a-zA-Z0-9_]+$` 白名单校验后才允许拼接（比 Java 版黑名单过滤更严）。
 3. **密码迁移双路径**：
    - 被动：存量 PBE 密文登录成功后自动 rehash 为 bcrypt（cost=12）；
    - 主动：任何改密/重置动作直接写 bcrypt（salt 清空），并推送飞书告警。
@@ -120,7 +144,8 @@ go run .
 
 ## 待办
 
-- 未实现全部 495 个业务端点（当前为可运行的安全骨架 + 登录/改密链路）。
+- P0-1（字典/分类/配置）已迁移，待 sqlpub 真实库回归（登录 → 首页字典/分类下拉）。
+- 未实现全部 495 个业务端点（下一批：P0-2 当前用户信息/菜单/权限）。
 - 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
   仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
 - 文件存储、对象存储、Quartz 调度、在线表单等模块未实现。
