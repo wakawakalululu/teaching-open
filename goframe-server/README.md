@@ -120,10 +120,37 @@ go run .
 | GET | `/api/sys/config/getCurrentConfig` | 对外公开配置（登录页加载） | 否（对齐 Shiro anon） |
 | GET | `/api/sys/config/getAllConfigList` / `getAllConfigMap` | 配置管理页查询 | 是 |
 | POST | `/api/sys/config/saveTenantConfig` | 保存租户配置（需 admin 角色，逐键 upsert） | 是 |
+| GET | `/api/sys/user/queryUserRole` / `userRoleList` | 用户角色查询 / 角色用户分页（含 status_dictText） | 是 |
+| POST/DELETE | `/api/sys/user/addSysUserRole` / `deleteUserRole` / `deleteUserRoleBatch` | 角色分配管理（角色等级校验） | 是 |
+| GET | `/api/sys/user/userDepartList` / `queryUserByDepId` / `departUserList` | 用户-部门关联查询 | 是 |
+| GET | `/api/sys/user/queryByOrgCode` / `queryByOrgCodeForAddressList` | 按部门编码查用户 / 通讯录 | 是 |
+| POST | `/api/sys/user/editSysDepartWithUser` | 用户加入部门（增量挂接） | 是 |
+| DELETE | `/api/sys/user/deleteUserInDepart` / `deleteUserInDepartBatch` | 移出部门（级联清理部门角色） | 是 |
+| GET | `/api/sys/user/getCurrentUserDeparts` | 当前登录人所属部门 | 是 |
+| GET | `/api/sys/user/list` | 用户分页（过滤/排序白名单 + 部门名/角色名聚合列 + 数据范围圈定） | 是 |
+| POST/PUT | `/api/sys/user/add` / `edit` | 用户新增/编辑（sys_user + sys_user_role + sys_user_depart 三表事务；新账号 bcrypt） | 是 |
+| DELETE | `/api/sys/user/delete` / `deleteBatch` | 删除用户（del_flag 逻辑删，回收站可还原） | 是 |
+| PUT | `/api/sys/user/frozenBatch` | 冻结/解冻（1=解冻 2=冻结，角色等级校验） | 是 |
+| GET | `/api/sys/user/queryById` / `queryByIds` / `generateUserId` | 用户详情 / 批量查询 / 生成主键 | 是 |
+| GET | `/api/sys/user/recycleBin` | 回收站列表（del_flag=1，orgCode 覆写部门名） | 是 |
+| PUT | `/api/sys/user/putRecycleBin` | 从回收站还原（del_flag 1→0） | 是 |
+| DELETE | `/api/sys/user/deleteRecycleBin` | 彻底删除（级联清理角色/部门关联） | 是 |
+| GET | `/api/sys/user/checkOnlyUser` / `querySysUser` | 唯一性校验 / 手机号查用户（脱敏） | 否（对齐 Shiro anon） |
+| POST | `/api/sys/sms` | 发送短信验证码（smsmode 0=登录 1=注册 2=忘记密码；短信通道未接入，验证码落日志） | 否（对齐 Shiro anon） |
+| POST | `/api/sys/user/register` | 注册（allowReg 开关 + 唯一性 + 验证码校验；新账号 bcrypt） | 否（对齐 Shiro anon） |
+| POST | `/api/sys/user/phoneVerification` | 忘记密码：手机号+验证码校验 | 否（对齐 Shiro anon） |
+| GET | `/api/sys/user/passwordChange` | 忘记密码：改密（username/password/smscode/phone） | 否（对齐 Shiro anon） |
 
 > P0-1 域（字典/分类/配置）契约对齐 Java V2.8 Controller。暂未迁移：Excel
 > 导入导出（`exportXls`/`importExcel`）、带过滤条件的表字典（4 段式 dictCode，
 > Java 版为原始 SQL 片段拼接，Go 版明确拒绝）。
+
+> P0-3 域（用户管理，32 端点）契约对齐 Java V2.8 SysUserController。暂未迁移：
+> Excel 导入导出（`exportXls`/`importExcel`/`importStudent`）、`/sys/phoneLogin`、
+> 登录验证码（`/sys/randomImage`/`/sys/checkCaptcha`，找回密码 Step1 依赖）。
+> 有意安全加固偏差：新账号一律 bcrypt（Java 为可逆 DES）；短信验证码 fail-closed
+> 校验（REDIS_ENABLED=false 时进程内存储兜底）；排序列白名单 + 列集合校验；
+> 验证码落日志仅限开发环境。
 
 ### 运维工具（`tools/`）
 
@@ -149,8 +176,10 @@ go run .
 
 ## 待办
 
-- P0-1（字典/分类/配置）已迁移，待 sqlpub 真实库回归（登录 → 首页字典/分类下拉）。
-- 未实现全部 495 个业务端点（下一批：P0-2 当前用户信息/菜单/权限）。
+- P0-1/P0-2/P0-3 已迁移（P0-3：用户管理 32 端点），待 sqlpub 真实库回归
+  （登录 → 用户列表增删改查 → 角色分配 → 部门关联）。
+- 未实现全部 495 个业务端点（下一批：P0-4 角色/权限/部门 CRUD）。
 - 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
   仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
+- 短信通道（阿里云 dysmsapi）未接入：验证码仅落日志（开发环境），生产接入时须移除该日志。
 - 文件存储、对象存储、Quartz 调度、在线表单等模块未实现。

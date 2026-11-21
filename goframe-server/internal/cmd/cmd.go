@@ -17,6 +17,12 @@ import (
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
+	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
+	ctrlUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/useraux"
+	ctrlUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/usercore"
+	ctrlUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userdepart"
+	ctrlUserReg "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userreg"
+	ctrlUserRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userrole"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
@@ -24,6 +30,12 @@ import (
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
+	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
+	svcUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/useraux"
+	svcUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/usercore"
+	svcUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userdepart"
+	svcUserReg "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userreg"
+	svcUserRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userrole"
 )
 
 var (
@@ -38,10 +50,16 @@ var (
 
 // 公开路径白名单（唯一允许绕过认证的入口）。
 var publicPaths = map[string]struct{}{
-	"/api/actuator/health":  {},
-	"/api/sys/login":        {},
-	"/api/sys/mLogin":       {},
-	"/api/sys/refreshToken": {},
+	"/api/actuator/health":            {},
+	"/api/sys/login":                  {},
+	"/api/sys/mLogin":                 {},
+	"/api/sys/refreshToken":           {},
+	"/api/sys/sms":                    {},
+	"/api/sys/user/checkOnlyUser":     {},
+	"/api/sys/user/querySysUser":      {},
+	"/api/sys/user/register":          {},
+	"/api/sys/user/phoneVerification": {},
+	"/api/sys/user/passwordChange":    {},
 }
 
 // routeGuard 路由守卫登记项。
@@ -100,12 +118,24 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	loginCtrl := ctrlLogin.New(loginSvc)
 	// P0-2 业务域：菜单/权限
 	permissionCtrl := ctrlPermission.New(svcPermission.New())
-	configCtrl := ctrlConfig.New(svcConfig.New(svcConfig.SiteOptions{
+	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
+	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
+	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
+	userauxCtrl := ctrlUseraux.New(svcUseraux.New())
+	// 站点配置服务：config 域与注册链路共用同一实例（注册读取 allowReg/_defaultRole/_defaultDepart）
+	configSvc := svcConfig.New(svcConfig.SiteOptions{
 		UploadType:   cfg.Site.UploadType,
 		StaticDomain: cfg.Site.StaticDomain,
 		FilePreview:  cfg.Site.FilePreview,
 		OwID:         cfg.Site.OwID,
-	}))
+	})
+	configCtrl := ctrlConfig.New(configSvc)
+	// P0-3 业务域：用户核心 CRUD；注册/找回密码自服务（短信验证码 fail-closed 存储，
+	// REDIS_ENABLED=false 时走进程内存储兜底）
+	usercoreCtrl := ctrlUsercore.New(svcUsercore.New())
+	smsSvc := svcSms.New(cfg.Security.RedisEnabled)
+	userRegCtrl := ctrlUserReg.New(svcUserReg.New(smsSvc, configSvc))
+	smsCtrl := ctrlSms.New(smsSvc)
 
 	// 2.1 数据库连接自检（带病启动则直接失败）
 	if err := g.DB().PingMaster(); err != nil {
@@ -147,6 +177,15 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/dict/getDictItems/:dictCode", dictCtrl.GetDictItems)
 		group.GET("/config/getCurrentConfig", configCtrl.GetCurrentConfig)
 		group.GET("/config/getConfig", configCtrl.GetConfig)
+		// 用户辅助域：与 Java Shiro anon 名单对齐（ShiroConfig.java L82/L84），
+		// 注册页/忘记密码页在未登录态调用
+		group.GET("/user/checkOnlyUser", userauxCtrl.CheckOnlyUser)
+		group.GET("/user/querySysUser", userauxCtrl.QuerySysUser)
+		// 注册/找回密码自服务链路（P0-3，ShiroConfig.java L80/L83/L85/L86 anon）
+		group.POST("/sms", smsCtrl.Send)
+		group.POST("/user/register", userRegCtrl.Register)
+		group.POST("/user/phoneVerification", userRegCtrl.PhoneVerification)
+		group.GET("/user/passwordChange", userRegCtrl.PasswordChange)
 	})
 
 	// 受保护路由
@@ -205,6 +244,40 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 
 		// 菜单/权限域（P0-2）
 		group.GET("/sys/permission/getUserPermissionByToken", permissionCtrl.GetUserPermissionByToken)
+
+		// 用户角色分配域（P0-3）
+		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
+		group.GET("/sys/user/userRoleList", userRoleCtrl.UserRoleList)
+		group.POST("/sys/user/addSysUserRole", userRoleCtrl.AddSysUserRole)
+		group.DELETE("/sys/user/deleteUserRole", userRoleCtrl.DeleteUserRole)
+		group.DELETE("/sys/user/deleteUserRoleBatch", userRoleCtrl.DeleteUserRoleBatch)
+
+		// 用户-部门关联域（P0-3）
+		group.GET("/sys/user/userDepartList", userDepartCtrl.UserDepartList)
+		group.GET("/sys/user/queryUserByDepId", userDepartCtrl.QueryUserByDepId)
+		group.GET("/sys/user/departUserList", userDepartCtrl.DepartUserList)
+		group.GET("/sys/user/queryByOrgCode", userDepartCtrl.QueryByOrgCode)
+		group.GET("/sys/user/queryByOrgCodeForAddressList", userDepartCtrl.QueryByOrgCodeForAddressList)
+		group.POST("/sys/user/editSysDepartWithUser", userDepartCtrl.EditSysDepartWithUser)
+		group.DELETE("/sys/user/deleteUserInDepart", userDepartCtrl.DeleteUserInDepart)
+		group.DELETE("/sys/user/deleteUserInDepartBatch", userDepartCtrl.DeleteUserInDepartBatch)
+		group.GET("/sys/user/getCurrentUserDeparts", userDepartCtrl.GetCurrentUserDeparts)
+
+		// 用户辅助域（P0-3）
+		group.GET("/sys/user/queryById", userauxCtrl.QueryById)
+		group.GET("/sys/user/generateUserId", userauxCtrl.GenerateUserId)
+		group.GET("/sys/user/queryByIds", userauxCtrl.QueryByIds)
+		group.GET("/sys/user/recycleBin", userauxCtrl.RecycleBin)
+		group.PUT("/sys/user/putRecycleBin", userauxCtrl.PutRecycleBin)
+		group.DELETE("/sys/user/deleteRecycleBin", userauxCtrl.DeleteRecycleBin)
+
+		// 用户核心 CRUD 域（P0-3）
+		group.GET("/sys/user/list", usercoreCtrl.List)
+		group.POST("/sys/user/add", usercoreCtrl.Add)
+		group.PUT("/sys/user/edit", usercoreCtrl.Edit)
+		group.DELETE("/sys/user/delete", usercoreCtrl.Delete)
+		group.DELETE("/sys/user/deleteBatch", usercoreCtrl.DeleteBatch)
+		group.PUT("/sys/user/frozenBatch", usercoreCtrl.FrozenBatch)
 	})
 
 	verifyRouteGuards()
@@ -254,6 +327,49 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/config/saveTenantConfig", true)
 	// 菜单/权限域（P0-2）
 	registerGuard("GET", "/api/sys/permission/getUserPermissionByToken", true)
+	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
+	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
+	registerGuard("GET", "/api/sys/user/querySysUser", false)
+
+	// 用户角色分配域（P0-3）
+	registerGuard("GET", "/api/sys/user/queryUserRole", true)
+	registerGuard("GET", "/api/sys/user/userRoleList", true)
+	registerGuard("POST", "/api/sys/user/addSysUserRole", true)
+	registerGuard("DELETE", "/api/sys/user/deleteUserRole", true)
+	registerGuard("DELETE", "/api/sys/user/deleteUserRoleBatch", true)
+
+	// 用户-部门关联域（P0-3）
+	registerGuard("GET", "/api/sys/user/userDepartList", true)
+	registerGuard("GET", "/api/sys/user/queryUserByDepId", true)
+	registerGuard("GET", "/api/sys/user/departUserList", true)
+	registerGuard("GET", "/api/sys/user/queryByOrgCode", true)
+	registerGuard("GET", "/api/sys/user/queryByOrgCodeForAddressList", true)
+	registerGuard("POST", "/api/sys/user/editSysDepartWithUser", true)
+	registerGuard("DELETE", "/api/sys/user/deleteUserInDepart", true)
+	registerGuard("DELETE", "/api/sys/user/deleteUserInDepartBatch", true)
+	registerGuard("GET", "/api/sys/user/getCurrentUserDeparts", true)
+
+	// 用户辅助域（P0-3）
+	registerGuard("GET", "/api/sys/user/queryById", true)
+	registerGuard("GET", "/api/sys/user/generateUserId", true)
+	registerGuard("GET", "/api/sys/user/queryByIds", true)
+	registerGuard("GET", "/api/sys/user/recycleBin", true)
+	registerGuard("PUT", "/api/sys/user/putRecycleBin", true)
+	registerGuard("DELETE", "/api/sys/user/deleteRecycleBin", true)
+
+	// 注册/找回密码自服务链路（P0-3，ShiroConfig.java L80/L83/L85/L86 anon）
+	registerGuard("POST", "/api/sys/sms", false)
+	registerGuard("POST", "/api/sys/user/register", false)
+	registerGuard("POST", "/api/sys/user/phoneVerification", false)
+	registerGuard("GET", "/api/sys/user/passwordChange", false)
+
+	// 用户核心 CRUD 域（P0-3）
+	registerGuard("GET", "/api/sys/user/list", true)
+	registerGuard("POST", "/api/sys/user/add", true)
+	registerGuard("PUT", "/api/sys/user/edit", true)
+	registerGuard("DELETE", "/api/sys/user/delete", true)
+	registerGuard("DELETE", "/api/sys/user/deleteBatch", true)
+	registerGuard("PUT", "/api/sys/user/frozenBatch", true)
 
 	for _, rt := range guardedRoutes {
 		if !isMutating(rt.method) {

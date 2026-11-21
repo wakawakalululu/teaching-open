@@ -22,7 +22,8 @@
 | 端到端验证 | ✅ 14 步全通过 | `tools/e2e`（本地 MariaDB + V2.8 种子数据实测） |
 | P0-1 字典/分类/配置 | ✅ 完成并实测 | 36 端点契约对齐 V2.8；字典/表字典/分类真实库抽查通过 |
 | P0-2 用户信息/菜单/权限 | ✅ 完成并实测 | 登录响应 sysAllDictItems（40 字典）+ 菜单树 menu=23/auth=3/allAuth=10 |
-| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~45 个（登录/改密 + P0-1） |
+| P0-3 用户管理 CRUD | ✅ 完成 | 32 端点：核心 CRUD + 角色分配 + 部门关联 + 回收站 + 注册/找回密码（见迁移说明） |
+| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~80 个（登录链路 + P0-1 + P0-2 + P0-3） |
 
 ---
 
@@ -54,7 +55,7 @@
 |---|---|---|---|
 | P0-1 | 字典 / 分类 / 站点配置 | ~15 | ✅ 已迁移（36 端点，2026-11-21）：`queryAllDictItems`/表字典/分类树/租户配置 |
 | P0-2 | 当前用户信息 / 菜单 / 权限 | ~12 | `sys/user/info`、`sys/permission/getUserPermissionByToken` |
-| P0-3 | 用户管理 CRUD | ~20 | 含部门关联、角色分配、导入导出 |
+| P0-3 | 用户管理 CRUD | ~20 | ✅ 已迁移（32 端点，2026-11-21）：核心 CRUD / 角色分配 / 部门关联 / 回收站 / 注册找回密码 |
 | P0-4 | 角色 / 权限 / 部门 CRUD | ~30 | RBAC 完整性 |
 
 > 本地完整运行环境（2026-11-21 实测通过）：
@@ -70,6 +71,25 @@
 > - 4 段式带过滤表字典明确拒绝（Java 版为原始 SQL 拼接，不安全）；
 > - Excel 导入导出未迁移；`refleshCache` 为兼容占位（Go 版字典直查库）；
 > - 已通过本地 MariaDB + V2.8 种子数据回归（见上方完整运行环境）。
+
+> P0-3 迁移说明（2026-11-21，三波次并行 agent 实施 + 主会话集成）：
+> - 32 端点分五个域：核心 CRUD（list/add/edit/delete/deleteBatch/frozenBatch）、
+>   角色分配（queryUserRole/userRoleList/addSysUserRole/deleteUserRole[Batch]）、
+>   部门关联（userDepartList/queryUserByDepId/departUserList/queryByOrgCode[ForAddressList]/
+>   editSysDepartWithUser/deleteUserInDepart[Batch]/getCurrentUserDeparts）、
+>   用户辅助（queryById/queryByIds/checkOnlyUser/generateUserId/querySysUser/回收站三件套）、
+>   注册找回密码（sms/register/phoneVerification/passwordChange，Shiro anon 公开）；
+> - add/edit 为 sys_user + sys_user_role + sys_user_depart 三表事务；delete 对齐
+>   Java @TableLogic 语义为 del_flag 逻辑删（不级联）；putRecycleBin 实为还原
+>   （revertLogicDeleted，1→0）；deleteRecycleBin 物理删并级联清理关联；
+> - 有意偏差（均注释文档化）：新账号一律 bcrypt（Java 可逆 DES）；addSysUserRole
+>   先全量校验再写库（Java 边校验边写会留部分状态）；排序列白名单 + 列集合校验
+>   （Java 仅黑名单）；frozenBatch「异常吞掉仍返回成功」的 Java 缺陷未照搬；
+> - 短信验证码 fail-closed：REDIS_ENABLED=true 走 Redis，否则进程内存储兜底，
+>   短信通道（阿里云）未接入，验证码落日志仅限开发环境；
+> - 暂未迁移：exportXls/importExcel/importStudent、/sys/phoneLogin、
+>   /sys/randomImage、/sys/checkCaptcha（找回密码 Step1 依赖，属登录验证码域）；
+> - 新增 6 个服务域单测（usercore/userrole/userdepart/useraux/sms/userreg，零 DB 依赖）。
 
 **验收标准**：前端登录后首页、菜单、字典下拉、用户列表全部可用。
 
