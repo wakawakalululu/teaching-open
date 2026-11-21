@@ -2,7 +2,7 @@
 
 > 用途：把本文件整体作为 prompt 交给任何 AI 会话，即可在无上下文的情况下
 > 按既定方向继续推进重构。配合仓库内 `goframe-v2` Skill 使用。
-> 最后更新：2026-11-21（进度：登录链路 + P0-1 + P0-2 完成并本地实测通过，下一任务 P0-3）
+> 最后更新：2026-11-21（进度：登录链路 + P0-1 + P0-2 + P0-3 完成并提交，Linux Go 全门槛验证通过；当前任务 P0-4）
 
 ---
 
@@ -24,9 +24,10 @@
 2. ~~P0-2 当前用户信息/菜单/权限~~ ✅ 完成（登录响应 sysAllDictItems、
    userInfo 白名单扩展、getUserPermissionByToken 菜单树/auth/allAuth，
    本地 MariaDB 实测 menu=23/auth=3/allAuth=10）
-3. **P0-3 用户管理 CRUD（当前任务）**：~20 端点，含部门关联、角色分配；
-   蓝本 SysUserController.java，注意 sys_user_department/sys_user_role 联表
-4. P0-4 角色/权限/部门 CRUD（~30 端点）
+3. ~~P0-3 用户管理 CRUD~~ ✅ 完成（32 端点：核心 CRUD/角色分配/部门关联/
+   用户辅助/注册找回密码 + sms，6 套零 DB 单测，Linux Go 全门槛通过）
+4. **P0-4 角色/权限/部门 CRUD（当前任务）**：~30 端点；蓝本
+   SysRoleController/SysDepartController/SysPermissionController/SysPermissionDataRuleController
 5. 阶段 2：课程/作业/作品/文件（P1，~65 端点）
 6. 阶段 3：日志/公告/站内信/定时任务（P2）
 7. 阶段 4：Go 承载 100% 流量 ≥2 周无故障后下线 Java
@@ -57,10 +58,13 @@
    `goframe-server/README.md` 端点表 → conventional commit → push 到
    `origin/master`（全局约定「固化成果并推送到远程仓库」）。
 
-## 当前状态快照（2026-11-21）
+## 当前状态快照（2026-11-21，P0-3 提交后）
 
-- 已迁移端点（~50）：登录/刷新/登出/改密/重置、`/sys/user/info`（简化版）、
-  P0-1 全部 36 个、`/sys/permission/getUserPermissionByToken`。
+- 已迁移端点（~80）：登录/刷新/登出/改密/重置、`/sys/user/info`（简化版）、
+  P0-1 全部 36 个、`/sys/permission/getUserPermissionByToken`、
+  P0-3 全部 32 个（用户管理五域：核心 CRUD/角色分配/部门关联/用户辅助/注册找回+sms）。
+- P0-3 已提交（36 文件 +6408 行），Linux Go 1.27.4 验证门槛全过。
+  e2e 尚未覆盖 P0-3（仅单测兜底），待真实库回归。
 - 登录响应已含 Java 契约的 `{token, userInfo, sysAllDictItems}`（refreshToken
   为 Go 版扩展字段）；`userInfo` 输出白名单超集。
 - `tools/e2e` 已扩展到 14 步并全过（本地 MariaDB + V2.8 种子数据）。
@@ -75,6 +79,17 @@
 
 ## 本机环境事实
 
+- **WSL1（Debian 13）环境已建成（2026-11-21）**：
+  - Linux Go 1.27.4：`~/tools/go`（PATH 已入 ~/.bashrc/.profile）；
+  - 便携 git 2.47.3：`~/tools/bin/git` 包装脚本（GIT_EXEC_PATH/LD_LIBRARY_PATH 已固化，
+    `~/tools/git-portable`）；
+  - GOPROXY=https://goproxy.cn（proxy.golang.org 被阻断），GOSUMDB=sum.golang.google.cn；
+  - Windows 互操作被沙箱禁用：**不能**从 WSL 运行 .exe；Windows 侧凭据
+    （GitHub push 凭据、凭据管理器）WSL 读不到，push 需 Windows 侧或用户提供 PAT；
+  - Windows 侧代理：http://127.0.0.1:7897（WSL1 共享网络栈，直连 GitHub 亦可 ls-remote）；
+  - 用 WSL git 操作仓库必须：`GIT_DIR=/mnt/c/Users/Admin/Desktop/code/teaching-open/.git/worktrees/teaching-open-v26`、
+    `GIT_WORK_TREE=<仓库根>`、`-c core.autocrlf=true`（否则 CRLF 幻影差异刷屏）；
+  - agent 派发约束：**每次最多同时 2 个**（用户要求）。
 - Windows 10，Git Bash；有 Go 1.27、无 Docker、无 gcc（cgo 不可用）。
 - **本地完整运行环境已建成**（Temp 目录，一次性验证用）：
   - 便携版 MariaDB 11.4.3：`C:\Users\Admin\AppData\Local\Temp\goframe-mysql\mariadb-11.4.3-winx64`，
