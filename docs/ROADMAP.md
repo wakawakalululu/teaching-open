@@ -25,7 +25,8 @@
 | P0-3 用户管理 CRUD | ✅ 完成 | 32 端点：核心 CRUD + 角色分配 + 部门关联 + 回收站 + 注册/找回密码（见迁移说明） |
 | P0-4a 角色管理域 | ✅ 完成并过 Linux 门槛 | 12 端点/13 路由：CRUD（admin 校验）+ queryall/queryMySubRole/checkRoleCode/queryTreeList + datarule 双端点（见迁移说明） |
 | P0-4b 菜单权限/授权域 | ✅ 完成并过 Linux 门槛 | 19 端点/22 路由：菜单 CRUD（物理级联递归 + is_leaf 维护）+ queryTreeList/queryRolePermission/saveRolePermission + 数据规则五端点 + 部门授权双端点（见迁移说明） |
-| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~112 个（登录链路 + P0-1 + P0-2 + P0-3 + P0-4a + P0-4b） |
+| P0-4c 部门/部门角色/部门权限域 | ✅ 完成并过 Linux 门槛 | 32 端点：部门 CRUD + YouBian orgCode 生成 + 五表级联删除 + 我的部门树 + 部门角色全套 + 部门权限全套（inSql 注入面修正，见迁移说明）。**P0 阶段收官** |
+| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~144 个（登录链路 + P0 全量；下一批 P1 课程域） |
 
 ---
 

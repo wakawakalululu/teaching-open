@@ -280,12 +280,13 @@ func (c *Controller) DataruleList(r *ghttp.Request) {
 		c.writeError(r, err)
 		return
 	}
-	// Result.ok(map)：code=200、message=「成功」；drChecked 缺失时整键不出现（对齐 Java）
+	// Result.ok(map)：code=200、message 保持默认「操作成功！」（Result.java:79-85
+	// 不设 message）；drChecked 缺失时整键不出现（对齐 Java）
 	payload := g.Map{"datarule": res.Rules}
 	if res.HasChecked {
 		payload["drChecked"] = res.DrChecked
 	}
-	common.OKMsg(r, "成功", payload)
+	common.OKMsg(r, "操作成功！", payload)
 }
 
 // DataruleSave 保存角色的菜单数据规则勾选。

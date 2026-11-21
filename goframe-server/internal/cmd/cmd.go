@@ -14,6 +14,9 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/config"
 	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
+	ctrlDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/depart"
+	ctrlDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departpermission"
+	ctrlDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departrole"
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
@@ -28,6 +31,9 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
+	svcDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/depart"
+	svcDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departpermission"
+	svcDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departrole"
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
@@ -122,6 +128,10 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	permissionCtrl := ctrlPermission.New(svcPermission.New())
 	// P0-4 业务域：角色管理（add/edit/delete 域内做 admin 角色校验）
 	roleCtrl := ctrlRole.New(svcRole.New())
+	// P0-4 业务域：部门管理 / 部门角色 / 部门权限
+	departCtrl := ctrlDepart.New(svcDepart.New())
+	departRoleCtrl := ctrlDepartRole.New(svcDepartRole.New())
+	departPermCtrl := ctrlDepartPerm.New(svcDepartPerm.New())
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -287,6 +297,44 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/sys/role/datarule/:permissionId/:roleId", roleCtrl.DataruleList)
 		group.POST("/sys/role/datarule", roleCtrl.DataruleSave)
 
+		// 部门管理域（P0-4c）
+		group.GET("/sys/sysDepart/queryTreeList", departCtrl.QueryTreeList)
+		group.GET("/sys/sysDepart/queryMyDeptTreeList", departCtrl.QueryMyDeptTreeList)
+		group.GET("/sys/sysDepart/queryIdTree", departCtrl.QueryIdTree)
+		group.POST("/sys/sysDepart/add", departCtrl.Add)
+		group.PUT("/sys/sysDepart/edit", departCtrl.Edit)
+		group.DELETE("/sys/sysDepart/delete", departCtrl.Delete)
+		group.DELETE("/sys/sysDepart/deleteBatch", departCtrl.DeleteBatch)
+		group.GET("/sys/sysDepart/searchBy", departCtrl.SearchBy)
+		group.GET("/sys/sysDepart/listAll", departCtrl.ListAll)
+		group.GET("/sys/sysDepart/removeAll", departCtrl.RemoveAll)
+
+		// 部门角色域（P0-4c）
+		group.GET("/sys/sysDepartRole/list", departRoleCtrl.List)
+		group.POST("/sys/sysDepartRole/add", departRoleCtrl.Add)
+		group.PUT("/sys/sysDepartRole/edit", departRoleCtrl.Edit)
+		group.DELETE("/sys/sysDepartRole/delete", departRoleCtrl.Delete)
+		group.DELETE("/sys/sysDepartRole/deleteBatch", departRoleCtrl.DeleteBatch)
+		group.GET("/sys/sysDepartRole/queryById", departRoleCtrl.QueryById)
+		group.GET("/sys/sysDepartRole/getDeptRoleList", departRoleCtrl.GetDeptRoleList)
+		group.POST("/sys/sysDepartRole/deptRoleUserAdd", departRoleCtrl.DeptRoleUserAdd)
+		group.GET("/sys/sysDepartRole/getDeptRoleByUserId", departRoleCtrl.GetDeptRoleByUserID)
+		group.GET("/sys/sysDepartRole/datarule/:permissionId/:departId/:roleId", departRoleCtrl.DataruleList)
+		group.POST("/sys/sysDepartRole/datarule", departRoleCtrl.DataruleSave)
+
+		// 部门权限域（P0-4c）
+		group.GET("/sys/sysDepartPermission/list", departPermCtrl.List)
+		group.POST("/sys/sysDepartPermission/add", departPermCtrl.Add)
+		group.PUT("/sys/sysDepartPermission/edit", departPermCtrl.Edit)
+		group.DELETE("/sys/sysDepartPermission/delete", departPermCtrl.Delete)
+		group.DELETE("/sys/sysDepartPermission/deleteBatch", departPermCtrl.DeleteBatch)
+		group.GET("/sys/sysDepartPermission/queryById", departPermCtrl.QueryById)
+		group.GET("/sys/sysDepartPermission/datarule/:permissionId/:departId", departPermCtrl.DataruleList)
+		group.POST("/sys/sysDepartPermission/datarule", departPermCtrl.DataruleSave)
+		group.GET("/sys/sysDepartPermission/queryDeptRolePermission", departPermCtrl.QueryDeptRolePermission)
+		group.POST("/sys/sysDepartPermission/saveDeptRolePermission", departPermCtrl.SaveDeptRolePermission)
+		group.GET("/sys/sysDepartPermission/queryTreeListForDeptRole", departPermCtrl.QueryTreeListForDeptRole)
+
 		// 用户角色分配域（P0-3）
 		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
 		group.GET("/sys/user/userRoleList", userRoleCtrl.UserRoleList)
@@ -407,6 +455,44 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/sys/role/queryTreeList", true)
 	registerGuard("GET", "/api/sys/role/datarule/:permissionId/:roleId", true)
 	registerGuard("POST", "/api/sys/role/datarule", true)
+
+	// 部门管理域（P0-4c）
+	registerGuard("GET", "/api/sys/sysDepart/queryTreeList", true)
+	registerGuard("GET", "/api/sys/sysDepart/queryMyDeptTreeList", true)
+	registerGuard("GET", "/api/sys/sysDepart/queryIdTree", true)
+	registerGuard("POST", "/api/sys/sysDepart/add", true)
+	registerGuard("PUT", "/api/sys/sysDepart/edit", true)
+	registerGuard("DELETE", "/api/sys/sysDepart/delete", true)
+	registerGuard("DELETE", "/api/sys/sysDepart/deleteBatch", true)
+	registerGuard("GET", "/api/sys/sysDepart/searchBy", true)
+	registerGuard("GET", "/api/sys/sysDepart/listAll", true)
+	registerGuard("GET", "/api/sys/sysDepart/removeAll", true)
+
+	// 部门角色域（P0-4c）
+	registerGuard("GET", "/api/sys/sysDepartRole/list", true)
+	registerGuard("POST", "/api/sys/sysDepartRole/add", true)
+	registerGuard("PUT", "/api/sys/sysDepartRole/edit", true)
+	registerGuard("DELETE", "/api/sys/sysDepartRole/delete", true)
+	registerGuard("DELETE", "/api/sys/sysDepartRole/deleteBatch", true)
+	registerGuard("GET", "/api/sys/sysDepartRole/queryById", true)
+	registerGuard("GET", "/api/sys/sysDepartRole/getDeptRoleList", true)
+	registerGuard("POST", "/api/sys/sysDepartRole/deptRoleUserAdd", true)
+	registerGuard("GET", "/api/sys/sysDepartRole/getDeptRoleByUserId", true)
+	registerGuard("GET", "/api/sys/sysDepartRole/datarule/:permissionId/:departId/:roleId", true)
+	registerGuard("POST", "/api/sys/sysDepartRole/datarule", true)
+
+	// 部门权限域（P0-4c）
+	registerGuard("GET", "/api/sys/sysDepartPermission/list", true)
+	registerGuard("POST", "/api/sys/sysDepartPermission/add", true)
+	registerGuard("PUT", "/api/sys/sysDepartPermission/edit", true)
+	registerGuard("DELETE", "/api/sys/sysDepartPermission/delete", true)
+	registerGuard("DELETE", "/api/sys/sysDepartPermission/deleteBatch", true)
+	registerGuard("GET", "/api/sys/sysDepartPermission/queryById", true)
+	registerGuard("GET", "/api/sys/sysDepartPermission/datarule/:permissionId/:departId", true)
+	registerGuard("POST", "/api/sys/sysDepartPermission/datarule", true)
+	registerGuard("GET", "/api/sys/sysDepartPermission/queryDeptRolePermission", true)
+	registerGuard("POST", "/api/sys/sysDepartPermission/saveDeptRolePermission", true)
+	registerGuard("GET", "/api/sys/sysDepartPermission/queryTreeListForDeptRole", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)

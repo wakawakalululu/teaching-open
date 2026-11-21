@@ -168,6 +168,28 @@ go run .
 > 「操作失败」（Java catch 同款话术）；checkRoleCode 的 code=0/result=true
 > 原形状逐字段保留。
 
+> P0-4c 域（部门管理 10 端点 + 部门角色 11 端点 + 部门权限 11 端点 = 32 路由）
+> 契约对齐 Java V2.8 SysDepartController/SysDepartRoleController/
+> SysDepartPermissionController。要点与偏差（注释文档化）：
+> - org_code/org_type 由 YouBian 流水规则服务端生成（OrgCodeRule 逐语义移植，
+>   根级取同级最大 code 递增、子级 = 父码 + 子段、org_type = 父级 +1）；
+> - delete/deleteBatch 物理删除 + 五表级联（递归收集子部门 → 清
+>   sys_user_depart/sys_depart_permission/sys_depart_role/
+>   sys_depart_role_permission/sys_depart_role_user），单事务；
+> - edit 拒绝换父（「暂不支持调整层级结构」）；树构建 isLeaf 由子节点存在性
+>   计算（对齐 FindsDepartsChildrenUtil 的 setEmptyChildrenAsNull）；
+> - queryMyDeptTreeList：userIdentity=2 上级树，admin/dev 重置为全部顶级部门，
+>   message 字段承载身份（"1"/"2"）；depart_ids 为空时 Java NPE→catch，
+>   Go 返回空树（文档化偏差）；
+> - getDeptRoleList 为「用户所在部门 ∩ org_code 前缀子部门」的角色集合；
+> - queryTreeListForDeptRole 的 inSql 字符串拼接（注入面）改为先查授权集合
+>   再参数化 IN；TreeModel 为 String 五参构造器路径（title=null、
+>   scopedSlots={"title":"hasDatarule"}）；
+> - saveDeptRolePermission 新增行 depart_id 落 NULL（Java 两参构造器现状）；
+> - 部门角色/权限的 delete 无级联（Java removeById 现状）；deptRoleUserAdd
+>   与 saveDeptRolePermission 包单事务（Java 无事务为文档化改进）；
+> - removeAll 仅清 sys_user_depart（Java 现状）；queryParentName 为前端死引用。
+
 > P0-4b 域（菜单权限 CRUD/角色授权/数据规则/部门授权，22 路由/19 端点）契约
 > 对齐 Java V2.8 SysPermissionController 其余端点。要点与偏差（注释文档化）：
 > - 删除为物理级联递归（子树 + 每节点四张关联表），单事务；is_leaf 双向维护；
@@ -203,9 +225,9 @@ go run .
 
 ## 待办
 
-- P0-1/P0-2/P0-3/P0-4a/P0-4b 已迁移，待 sqlpub 真实库回归
-  （登录 → 用户列表增删改查 → 角色分配 → 菜单/角色授权 → 部门关联）。
-- 未实现全部 495 个业务端点（下一批：P0-4c 部门域 CRUD/树/部门角色）。
+- P0-1/P0-2/P0-3/P0-4a/P0-4b/P0-4c 已迁移（**P0 阶段完成**），待 sqlpub 真实库回归
+  （登录 → 用户列表增删改查 → 角色分配 → 菜单/角色授权 → 部门树/部门角色 → 部门关联）。
+- 未实现全部 495 个业务端点（下一批：P1 课程/单元/课程授权/文件域）。
 - 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
   仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
 - 短信通道（阿里云 dysmsapi）未接入：验证码仅落日志（开发环境），生产接入时须移除该日志。
