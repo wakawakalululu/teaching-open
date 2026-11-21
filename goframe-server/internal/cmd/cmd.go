@@ -24,6 +24,7 @@ import (
 	ctrlDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departpermission"
 	ctrlDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departrole"
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
+	ctrlExcelx "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/excelx"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
 	ctrlQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/qiniu"
@@ -44,6 +45,7 @@ import (
 	ctrlUserRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userrole"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
+	"github.com/wakawakalululu/teaching-open/goframe-server/internal/passwd"
 	svcAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/additionalwork"
 	svcAnnouncement "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/announcement"
 	svcCaptcha "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/captcha"
@@ -192,6 +194,14 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	teachingDayLogCtrl := ctrlTeachingDayLog.New(svcTeachingDayLog.New(cfg.Security.RedisEnabled))
 	// P2 业务域：登录验证码（anon，Redis/内存双态 600s TTL）
 	captchaCtrl := ctrlCaptcha.New(svcCaptcha.New(cfg.Security.RedisEnabled))
+	// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
+	excelxCtrl := ctrlExcelx.New(func(plain string) string {
+		h, herr := passwd.Hash(plain)
+		if herr != nil {
+			return ""
+		}
+		return h
+	})
 	// P2 业务域：Scratch 素材库/背包（背包内容本地存储，七牛上传为文档化待补齐）
 	scratchCtrl := ctrlScratch.New(svcScratch.New(cfg.Security.RedisEnabled,
 		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType,
@@ -573,6 +583,19 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 
 		// P2-6 泛型域与特殊端点（在闭包内以 group/guard 装配）
 		wireP2_6Domains(group, registerGuard, svcSSPkg.New())
+
+		// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
+		for _, exBase := range excelxBases {
+			group.GET(exBase+"/exportXls", excelxCtrl.ExportXls(exBase))
+			group.POST(exBase+"/exportXls", excelxCtrl.ExportXls(exBase))
+			group.POST(exBase+"/importExcel", excelxCtrl.ImportExcel(exBase))
+			registerGuard("GET", "/api"+exBase+"/exportXls", true)
+			registerGuard("POST", "/api"+exBase+"/exportXls", true)
+			registerGuard("POST", "/api"+exBase+"/importExcel", true)
+		}
+		// 学生批量导入（student 角色 + 默认班级绑定）
+		group.POST("/sys/user/importStudent", excelxCtrl.ImportStudent)
+		registerGuard("POST", "/api/sys/user/importStudent", true)
 		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
 		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
 		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)

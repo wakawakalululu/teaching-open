@@ -45,6 +45,15 @@ var p2_6_domains = []crudDomainDef{
 		"job_class_name", "cron_expression", "parameter", "description", "status"}},
 }
 
+// excelxBases 已接入 Excel 能力的域基路径。
+var excelxBases = []string{
+	"/sys/fillRule", "/sys/checkRule", "/sys/dataSource", "/sys/position",
+	"/sys/log", "/sys/dataLog", "/sys/quartzJob", "/sys/annountCement",
+	"/sys/user", "/teaching/teachingNews", "/teaching/teachingCourse",
+	"/teaching/teachingCourseUnit", "/teaching/teachingCourseDept",
+	"/teaching/teachingWork", "/teaching/teachingScratchAssets",
+}
+
 // wireP2_6Domains 装配 P2-6 泛型域路由、守卫与特殊端点。
 func wireP2_6Domains(group *ghttp.RouterGroup, guard func(method, path string, requireAuth bool),
 	special *svcSS.Service) {
