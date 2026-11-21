@@ -60,6 +60,7 @@ import (
 	svcScratch "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/scratch"
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
 	svcSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysfile"
+	svcSSPkg "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysspecial"
 	svcTeachingDayLog "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingdaylog"
 	svcTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingmenu"
 	svcTeachingNews "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingnews"
@@ -560,6 +561,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.PUT("/sys/sysAnnouncementSend/editByAnntIdAndUserId", announcementCtrl.EditByAnntIdAndUserID)
 		group.GET("/sys/sysAnnouncementSend/getMyAnnouncementSend", announcementCtrl.GetMyAnnouncementSend)
 		group.PUT("/sys/sysAnnouncementSend/readAll", announcementCtrl.ReadAll)
+
+		// P2-6 泛型域与特殊端点（在闭包内以 group/guard 装配）
+		wireP2_6Domains(group, registerGuard, svcSSPkg.New())
 		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
 		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
 		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)

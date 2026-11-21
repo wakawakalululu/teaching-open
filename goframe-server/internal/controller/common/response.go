@@ -45,3 +45,15 @@ func Fail(r *ghttp.Request, message string) {
 		"timestamp": time.Now().UnixMilli(),
 	})
 }
+
+// FailMsg 业务失败响应（自定义话术 + 数据；对应 Java Result.error(int,msg)
+// 附带 result 的形状——如 checkByCode 不通过时 result=校验明细）。
+func FailMsg(r *ghttp.Request, message string, data interface{}) {
+	r.Response.WriteJson(g.Map{
+		"success":   false,
+		"message":   message,
+		"code":      500,
+		"result":    data,
+		"timestamp": time.Now().UnixMilli(),
+	})
+}
