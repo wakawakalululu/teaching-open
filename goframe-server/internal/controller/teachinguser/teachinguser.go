@@ -150,3 +150,10 @@ func (c *Controller) GetUserSectionInfoByToken(r *ghttp.Request) {
 		"sysOrgCode":  res.OrgCode,
 	})
 }
+
+// AppEdit APP 端用户资料编辑。
+// 契约：PUT /sys/user/appEdit（JSON 全字段透传，密码保留旧值——与
+// /teaching/user/edit 同构）。
+func (c *Controller) AppEdit(r *ghttp.Request) {
+	c.Edit(r)
+}

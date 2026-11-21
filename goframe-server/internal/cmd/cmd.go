@@ -14,6 +14,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/config"
 	ctrlAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/additionalwork"
 	ctrlAnnouncement "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/announcement"
+	ctrlCaptcha "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/captcha"
 	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
 	ctrlCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/course"
@@ -45,6 +46,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	svcAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/additionalwork"
 	svcAnnouncement "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/announcement"
+	svcCaptcha "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/captcha"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
 	svcCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/course"
@@ -188,6 +190,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	additionalWorkCtrl := ctrlAdditionalWork.New(svcAdditionalWork.New(cfg.Security.RedisEnabled))
 	// P2 业务域：班级日志（计数行 upsert 与聚合报表）
 	teachingDayLogCtrl := ctrlTeachingDayLog.New(svcTeachingDayLog.New(cfg.Security.RedisEnabled))
+	// P2 业务域：登录验证码（anon，Redis/内存双态 600s TTL）
+	captchaCtrl := ctrlCaptcha.New(svcCaptcha.New(cfg.Security.RedisEnabled))
 	// P2 业务域：Scratch 素材库/背包（背包内容本地存储，七牛上传为文档化待补齐）
 	scratchCtrl := ctrlScratch.New(svcScratch.New(cfg.Security.RedisEnabled,
 		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType,
@@ -262,6 +266,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/user/register", userRegCtrl.Register)
 		group.POST("/user/phoneVerification", userRegCtrl.PhoneVerification)
 		group.GET("/user/passwordChange", userRegCtrl.PasswordChange)
+		// 登录验证码域 anon（登录页未登录可调）
+		group.GET("/sys/randomImage/{key}", captchaCtrl.RandomImage)
+		group.POST("/sys/checkCaptcha", captchaCtrl.CheckCaptcha)
 		// 课程域 anon（ShiroConfig.java:158 首页未登录可调）
 		group.GET("/teaching/teachingCourse/getHomeCourse", courseCtrl.GetHomeCourse)
 		// 门户菜单 anon（ShiroConfig.java:145）
@@ -429,6 +436,7 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/teaching/user/getUserRootDept", teachingUserCtrl.UserRootDept)
 		group.PUT("/teaching/user/edit", teachingUserCtrl.Edit)
 		group.GET("/teaching/user/appUserList", teachingUserCtrl.AppUserList)
+		group.PUT("/sys/user/appEdit", teachingUserCtrl.AppEdit)
 
 		// 课程单元域（P1-2）
 		group.GET("/teaching/teachingCourseUnit/mineUnit", courseUnitCtrl.MineUnit)
@@ -746,6 +754,7 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/teaching/user/getUserRootDept", true)
 	registerGuard("PUT", "/api/teaching/user/edit", true)
 	registerGuard("GET", "/api/teaching/user/appUserList", true)
+	registerGuard("PUT", "/api/sys/user/appEdit", true)
 
 	// 课程单元域（P1-2）
 	registerGuard("GET", "/api/teaching/teachingCourseUnit/mineUnit", true)
@@ -931,6 +940,8 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/user/register", false)
 	registerGuard("POST", "/api/sys/user/phoneVerification", false)
 	registerGuard("GET", "/api/sys/user/passwordChange", false)
+	registerGuard("GET", "/api/sys/randomImage/{key}", false)
+	registerGuard("POST", "/api/sys/checkCaptcha", false)
 
 	// 用户核心 CRUD 域（P0-3）
 	registerGuard("GET", "/api/sys/user/list", true)
