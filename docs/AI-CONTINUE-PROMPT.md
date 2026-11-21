@@ -2,7 +2,8 @@
 
 > 用途：把本文件整体作为 prompt 交给任何 AI 会话，即可在无上下文的情况下
 > 按既定方向继续推进重构。配合仓库内 `goframe-v2` Skill 使用。
-> 最后更新：2026-11-21（进度：登录链路 + P0-1 + P0-2 + P0-3 完成并提交，Linux Go 全门槛验证通过；当前任务 P0-4）
+> 最后更新：2026-11-21（进度：**P0 阶段全部完成**——登录链路 + P0-1 + P0-2 +
+> P0-3 + P0-4a/b/c 共 ~144 端点，Linux Go 门槛全过；当前任务 P1-1 课程域）
 
 ---
 
@@ -26,11 +27,23 @@
    本地 MariaDB 实测 menu=23/auth=3/allAuth=10）
 3. ~~P0-3 用户管理 CRUD~~ ✅ 完成（32 端点：核心 CRUD/角色分配/部门关联/
    用户辅助/注册找回密码 + sms，6 套零 DB 单测，Linux Go 全门槛通过）
-4. **P0-4 角色/权限/部门 CRUD（当前任务）**：~30 端点；蓝本
-   SysRoleController/SysDepartController/SysPermissionController/SysPermissionDataRuleController
-5. 阶段 2：课程/作业/作品/文件（P1，~65 端点）
-6. 阶段 3：日志/公告/站内信/定时任务（P2）
+4. ~~P0-4 角色/权限/部门 CRUD~~ ✅ 完成（P0-4a 角色域 12 端点 + P0-4b 菜单
+   权限/授权域 19 端点 + P0-4c 部门/部门角色/部门权限 32 端点，**P0 收官**）
+5. **阶段 2：P1 业务域（当前）**——分波次：P1-1 课程域 TeachingCourse(10)+
+   TeachingUser(3) → P1-2 单元域 TeachingCourseUnit(11) → P1-3 授权域
+   TeachingCourseDept(9)+门户菜单 TeachingMenu(11) → P1-4 文件域
+   SysFile/Qiniu/Upload
+6. 阶段 3：P2 运营域（作业 24/资讯 10/附加作业 9/班级日志 12/Scratch 素材+背包
+   13/公告 21/填Rules/校验规则/数据源/岗位/日志/消息/Quartz）
 7. 阶段 4：Go 承载 100% 流量 ≥2 周无故障后下线 Java
+
+## 端点总量盘点（2026-11-21 契约分析）
+
+Java 模块方法级端点 **484 个**（与 495 基线的差异为统计口径，以本清单为准）；
+demo/mock 包 73 个**不迁移**；test/websocket/actuator 类不迁移。
+teaching 包 11 个 Controller 共 105 端点（课程 10/单元 11/课程授权 9/用户 3/
+门户菜单 11/资讯 10/作业 24/附加作业 9/班级日志 12/Scratch 素材 9/背包 4）。
+迁移进度 ~144/484。
 
 ## 硬性规范（违反即返工）
 
