@@ -13,6 +13,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/auth"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/config"
 	ctrlAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/additionalwork"
+	ctrlAnnouncement "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/announcement"
 	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
 	ctrlCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/course"
@@ -43,6 +44,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	svcAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/additionalwork"
+	svcAnnouncement "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/announcement"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
 	svcCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/course"
@@ -189,6 +191,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	scratchCtrl := ctrlScratch.New(svcScratch.New(cfg.Security.RedisEnabled,
 		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType,
 		cfg.Storage.LocalRoot))
+	// P2 业务域：系统通告/发送记录
+	announcementCtrl := ctrlAnnouncement.New(svcAnnouncement.New())
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -533,6 +537,29 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/teaching/scratch/backpack/save", scratchCtrl.BackpackSave)
 		group.DELETE("/teaching/scratch/backpack/delete", scratchCtrl.BackpackDelete)
 		group.GET("/teaching/scratch/backpack/getFile/*filename", scratchCtrl.BackpackGetFile)
+
+		// 系统通告域（P2-5）
+		group.GET("/sys/annountCement/list", announcementCtrl.List)
+		group.POST("/sys/annountCement/add", announcementCtrl.Add)
+		group.PUT("/sys/annountCement/edit", announcementCtrl.Edit)
+		group.DELETE("/sys/annountCement/delete", announcementCtrl.Delete)
+		group.DELETE("/sys/annountCement/deleteBatch", announcementCtrl.DeleteBatch)
+		group.GET("/sys/annountCement/queryById", announcementCtrl.QueryByID)
+		group.GET("/sys/annountCement/doReleaseData", announcementCtrl.DoReleaseData)
+		group.GET("/sys/annountCement/doReovkeData", announcementCtrl.DoReovkeData)
+		group.GET("/sys/annountCement/listByUser", announcementCtrl.ListByUser)
+		group.GET("/sys/annountCement/syncNotic", announcementCtrl.SyncNotic)
+
+		// 通告发送记录域（P2-5）
+		group.GET("/sys/sysAnnouncementSend/list", announcementCtrl.SendList)
+		group.POST("/sys/sysAnnouncementSend/add", announcementCtrl.SendAdd)
+		group.PUT("/sys/sysAnnouncementSend/edit", announcementCtrl.SendEdit)
+		group.DELETE("/sys/sysAnnouncementSend/delete", announcementCtrl.SendDelete)
+		group.DELETE("/sys/sysAnnouncementSend/deleteBatch", announcementCtrl.SendDeleteBatch)
+		group.GET("/sys/sysAnnouncementSend/queryById", announcementCtrl.SendQueryByID)
+		group.PUT("/sys/sysAnnouncementSend/editByAnntIdAndUserId", announcementCtrl.EditByAnntIdAndUserID)
+		group.GET("/sys/sysAnnouncementSend/getMyAnnouncementSend", announcementCtrl.GetMyAnnouncementSend)
+		group.PUT("/sys/sysAnnouncementSend/readAll", announcementCtrl.ReadAll)
 		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
 		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
 		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)
@@ -840,6 +867,29 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/teaching/scratch/backpack/save", true)
 	registerGuard("DELETE", "/api/teaching/scratch/backpack/delete", true)
 	registerGuard("GET", "/api/teaching/scratch/backpack/getFile/*filename", true)
+
+	// 系统通告域（P2-5）
+	registerGuard("GET", "/api/sys/annountCement/list", true)
+	registerGuard("POST", "/api/sys/annountCement/add", true)
+	registerGuard("PUT", "/api/sys/annountCement/edit", true)
+	registerGuard("DELETE", "/api/sys/annountCement/delete", true)
+	registerGuard("DELETE", "/api/sys/annountCement/deleteBatch", true)
+	registerGuard("GET", "/api/sys/annountCement/queryById", true)
+	registerGuard("GET", "/api/sys/annountCement/doReleaseData", true)
+	registerGuard("GET", "/api/sys/annountCement/doReovkeData", true)
+	registerGuard("GET", "/api/sys/annountCement/listByUser", true)
+	registerGuard("GET", "/api/sys/annountCement/syncNotic", true)
+
+	// 通告发送记录域（P2-5）
+	registerGuard("GET", "/api/sys/sysAnnouncementSend/list", true)
+	registerGuard("POST", "/api/sys/sysAnnouncementSend/add", true)
+	registerGuard("PUT", "/api/sys/sysAnnouncementSend/edit", true)
+	registerGuard("DELETE", "/api/sys/sysAnnouncementSend/delete", true)
+	registerGuard("DELETE", "/api/sys/sysAnnouncementSend/deleteBatch", true)
+	registerGuard("GET", "/api/sys/sysAnnouncementSend/queryById", true)
+	registerGuard("PUT", "/api/sys/sysAnnouncementSend/editByAnntIdAndUserId", true)
+	registerGuard("GET", "/api/sys/sysAnnouncementSend/getMyAnnouncementSend", true)
+	registerGuard("PUT", "/api/sys/sysAnnouncementSend/readAll", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
