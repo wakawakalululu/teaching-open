@@ -249,6 +249,29 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		// 菜单/权限域（P0-2）
 		group.GET("/sys/permission/getUserPermissionByToken", permissionCtrl.GetUserPermissionByToken)
 
+		// 菜单权限 CRUD / 角色授权 / 数据规则 / 部门授权域（P0-4b）
+		group.GET("/sys/permission/list", permissionCtrl.MenuList)
+		group.GET("/sys/permission/getSystemMenuList", permissionCtrl.SystemMenuList)
+		group.GET("/sys/permission/getSystemSubmenu", permissionCtrl.SystemSubmenu)
+		group.GET("/sys/permission/getSystemSubmenuBatch", permissionCtrl.SystemSubmenuBatch)
+		group.POST("/sys/permission/add", permissionCtrl.MenuAdd)
+		group.PUT("/sys/permission/edit", permissionCtrl.MenuEdit)
+		group.POST("/sys/permission/edit", permissionCtrl.MenuEdit)
+		group.DELETE("/sys/permission/delete", permissionCtrl.MenuDelete)
+		group.DELETE("/sys/permission/deleteBatch", permissionCtrl.MenuDeleteBatch)
+		group.GET("/sys/permission/queryTreeList", permissionCtrl.PermissionTreeList)
+		group.GET("/sys/permission/queryListAsync", permissionCtrl.QueryListAsync)
+		group.GET("/sys/permission/queryRolePermission", permissionCtrl.QueryRolePermission)
+		group.POST("/sys/permission/saveRolePermission", permissionCtrl.SaveRolePermission)
+		group.GET("/sys/permission/getPermRuleListByPermId", permissionCtrl.GetPermRuleListByPermId)
+		group.POST("/sys/permission/addPermissionRule", permissionCtrl.AddPermissionRule)
+		group.PUT("/sys/permission/editPermissionRule", permissionCtrl.EditPermissionRule)
+		group.POST("/sys/permission/editPermissionRule", permissionCtrl.EditPermissionRule)
+		group.DELETE("/sys/permission/deletePermissionRule", permissionCtrl.DeletePermissionRule)
+		group.GET("/sys/permission/queryPermissionRule", permissionCtrl.QueryPermissionRule)
+		group.GET("/sys/permission/queryDepartPermission", permissionCtrl.QueryDepartPermission)
+		group.POST("/sys/permission/saveDepartPermission", permissionCtrl.SaveDepartPermission)
+
 		// 角色管理域（P0-4a）
 		group.GET("/sys/role/list", roleCtrl.List)
 		group.POST("/sys/role/add", roleCtrl.Add)
@@ -346,6 +369,29 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/config/saveTenantConfig", true)
 	// 菜单/权限域（P0-2）
 	registerGuard("GET", "/api/sys/permission/getUserPermissionByToken", true)
+
+	// 菜单权限 CRUD / 角色授权 / 数据规则 / 部门授权域（P0-4b）
+	registerGuard("GET", "/api/sys/permission/list", true)
+	registerGuard("GET", "/api/sys/permission/getSystemMenuList", true)
+	registerGuard("GET", "/api/sys/permission/getSystemSubmenu", true)
+	registerGuard("GET", "/api/sys/permission/getSystemSubmenuBatch", true)
+	registerGuard("POST", "/api/sys/permission/add", true)
+	registerGuard("PUT", "/api/sys/permission/edit", true)
+	registerGuard("POST", "/api/sys/permission/edit", true)
+	registerGuard("DELETE", "/api/sys/permission/delete", true)
+	registerGuard("DELETE", "/api/sys/permission/deleteBatch", true)
+	registerGuard("GET", "/api/sys/permission/queryTreeList", true)
+	registerGuard("GET", "/api/sys/permission/queryListAsync", true)
+	registerGuard("GET", "/api/sys/permission/queryRolePermission", true)
+	registerGuard("POST", "/api/sys/permission/saveRolePermission", true)
+	registerGuard("GET", "/api/sys/permission/getPermRuleListByPermId", true)
+	registerGuard("POST", "/api/sys/permission/addPermissionRule", true)
+	registerGuard("PUT", "/api/sys/permission/editPermissionRule", true)
+	registerGuard("POST", "/api/sys/permission/editPermissionRule", true)
+	registerGuard("DELETE", "/api/sys/permission/deletePermissionRule", true)
+	registerGuard("GET", "/api/sys/permission/queryPermissionRule", true)
+	registerGuard("GET", "/api/sys/permission/queryDepartPermission", true)
+	registerGuard("POST", "/api/sys/permission/saveDepartPermission", true)
 
 	// 角色管理域（P0-4a；add/edit/delete/deleteBatch 服务内含 admin 校验）
 	registerGuard("GET", "/api/sys/role/list", true)

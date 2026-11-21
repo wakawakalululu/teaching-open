@@ -168,6 +168,17 @@ go run .
 > 「操作失败」（Java catch 同款话术）；checkRoleCode 的 code=0/result=true
 > 原形状逐字段保留。
 
+> P0-4b 域（菜单权限 CRUD/角色授权/数据规则/部门授权，22 路由/19 端点）契约
+> 对齐 Java V2.8 SysPermissionController 其余端点。要点与偏差（注释文档化）：
+> - 删除为物理级联递归（子树 + 每节点四张关联表），单事务；is_leaf 双向维护；
+> - 角色授权 saveRolePermission 为 diff 算法，Java 无事务 → Go 包单事务；
+> - saveDepartPermission 的部门角色授权清理：Java 仅按 permission_id 过滤
+>   （roleIds 查出未用，跨部门误删）→ Go 收敛为该部门角色 IN 范围；
+> - queryListAsync：Java SQL 引用不存在的 leaf_flag 列必然报错被 catch 吞掉
+>  （前端无调用方）→ Go 用 is_leaf 修正实现；
+> - deleteBatch 异常分支返回「删除成功!」的缺陷话术未照搬；
+> - loadAllRoleIds 为前端死引用（Java 无对应端点），未迁移。
+
 ### 运维工具（`tools/`）
 
 | 工具 | 用途 |
@@ -192,9 +203,9 @@ go run .
 
 ## 待办
 
-- P0-1/P0-2/P0-3/P0-4a 已迁移（P0-4a：角色管理域），待 sqlpub 真实库回归
-  （登录 → 用户列表增删改查 → 角色分配 → 部门关联）。
-- 未实现全部 495 个业务端点（下一批：P0-4b 菜单/权限 CRUD + P0-4c 部门域）。
+- P0-1/P0-2/P0-3/P0-4a/P0-4b 已迁移，待 sqlpub 真实库回归
+  （登录 → 用户列表增删改查 → 角色分配 → 菜单/角色授权 → 部门关联）。
+- 未实现全部 495 个业务端点（下一批：P0-4c 部门域 CRUD/树/部门角色）。
 - 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
   仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
 - 短信通道（阿里云 dysmsapi）未接入：验证码仅落日志（开发环境），生产接入时须移除该日志。

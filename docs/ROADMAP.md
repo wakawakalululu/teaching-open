@@ -24,7 +24,8 @@
 | P0-2 用户信息/菜单/权限 | ✅ 完成并实测 | 登录响应 sysAllDictItems（40 字典）+ 菜单树 menu=23/auth=3/allAuth=10 |
 | P0-3 用户管理 CRUD | ✅ 完成 | 32 端点：核心 CRUD + 角色分配 + 部门关联 + 回收站 + 注册/找回密码（见迁移说明） |
 | P0-4a 角色管理域 | ✅ 完成并过 Linux 门槛 | 12 端点/13 路由：CRUD（admin 校验）+ queryall/queryMySubRole/checkRoleCode/queryTreeList + datarule 双端点（见迁移说明） |
-| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~93 个（登录链路 + P0-1 + P0-2 + P0-3 + P0-4a） |
+| P0-4b 菜单权限/授权域 | ✅ 完成并过 Linux 门槛 | 19 端点/22 路由：菜单 CRUD（物理级联递归 + is_leaf 维护）+ queryTreeList/queryRolePermission/saveRolePermission + 数据规则五端点 + 部门授权双端点（见迁移说明） |
+| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~112 个（登录链路 + P0-1 + P0-2 + P0-3 + P0-4a + P0-4b） |
 
 ---
 
@@ -58,7 +59,21 @@
 | P0-2 | 当前用户信息 / 菜单 / 权限 | ~12 | `sys/user/info`、`sys/permission/getUserPermissionByToken` |
 | P0-3 | 用户管理 CRUD | ~20 | ✅ 已迁移（32 端点，2026-11-21）：核心 CRUD / 角色分配 / 部门关联 / 回收站 / 注册找回密码 |
 | P0-4 | 角色 / 权限 / 部门 CRUD | ~30 | RBAC 完整性；**拆三波次**：P0-4a 角色域 ✅（2026-11-21）→
-  P0-4b 菜单/权限 CRUD + 角色授权 + 数据规则 → P0-4c 部门/部门角色/部门权限 |
+  P0-4b 菜单权限/授权域 ✅（2026-11-21）→ P0-4c 部门/部门角色/部门权限 |
+
+> P0-4b 迁移说明（2026-11-21）：
+> - 19 端点/22 路由（edit/editPermissionRule Java 均接受 PUT+POST）；
+> - 删除单事务物理级联递归：子树逐节点清理 sys_permission_data_rule/
+>   sys_role_permission/sys_depart_permission/sys_depart_role_permission 四表；
+> - is_leaf 维护对齐 setMenuLeaf 注解 SQL：add 父置非叶；edit 按父子变化双向修正；
+> - saveRolePermission diff 算法（getDiff 参数序逐语义移植），包单事务（Java 无）；
+> - saveDepartPermission 清理面收敛（修复 Java 跨部门误删缺陷，文档化）；
+> - queryListAsync 用 is_leaf 修正 Java leaf_flag 死列缺陷（前端无调用方）；
+> - QueryGenerator 语义修正：字符串过滤无前缀为 EQ（含 * 通配 → LIKE、, → IN、
+>   != → NE），P0-4a 角色列表同步修正；
+> - intelligentProcessData 逐语义移植（含 Java src/views/ 先被 views/ 命中的怪癖）；
+> - 新增 dao：sys_depart_permission；sys_depart_role/sys_depart_role_permission
+>   经裸模型访问（P0-4c 建 dao）。
 
 > P0-4a 迁移说明（2026-11-21）：
 > - 12 端点/13 路由（edit 在 Java 同时接受 PUT/POST）；exportXls/importExcel 未迁移；
