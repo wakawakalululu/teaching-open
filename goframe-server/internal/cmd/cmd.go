@@ -28,6 +28,7 @@ import (
 	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
 	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
 	ctrlSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sysfile"
+	ctrlTeachingDayLog "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingdaylog"
 	ctrlTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingmenu"
 	ctrlTeachingNews "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingnews"
 	ctrlTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachinguser"
@@ -55,6 +56,7 @@ import (
 	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
 	svcSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysfile"
+	svcTeachingDayLog "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingdaylog"
 	svcTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingmenu"
 	svcTeachingNews "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingnews"
 	svcTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachinguser"
@@ -179,6 +181,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	// P2 业务域：资讯（anon 列表/详情）/附加作业
 	teachingNewsCtrl := ctrlTeachingNews.New(svcTeachingNews.New())
 	additionalWorkCtrl := ctrlAdditionalWork.New(svcAdditionalWork.New(cfg.Security.RedisEnabled))
+	// P2 业务域：班级日志（计数行 upsert 与聚合报表）
+	teachingDayLogCtrl := ctrlTeachingDayLog.New(svcTeachingDayLog.New(cfg.Security.RedisEnabled))
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -496,6 +500,18 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.DELETE("/teaching/teachingAdditionalWork/delete", additionalWorkCtrl.Delete)
 		group.DELETE("/teaching/teachingAdditionalWork/deleteBatch", additionalWorkCtrl.DeleteBatch)
 		group.GET("/teaching/teachingAdditionalWork/queryById", additionalWorkCtrl.QueryByID)
+
+		// 班级日志域（P2-3）
+		group.GET("/teaching/teachingDepartDayLog/getReport", teachingDayLogCtrl.GetReport)
+		group.GET("/teaching/teachingDepartDayLog/getReportGroupByDepart", teachingDayLogCtrl.GetReportGroupByDepart)
+		group.GET("/teaching/teachingDepartDayLog/getReportGroupByMonth", teachingDayLogCtrl.GetReportGroupByMonth)
+		group.GET("/teaching/teachingDepartDayLog/list", teachingDayLogCtrl.List)
+		group.POST("/teaching/teachingDepartDayLog/add", teachingDayLogCtrl.Add)
+		group.PUT("/teaching/teachingDepartDayLog/edit", teachingDayLogCtrl.Edit)
+		group.DELETE("/teaching/teachingDepartDayLog/delete", teachingDayLogCtrl.Delete)
+		group.DELETE("/teaching/teachingDepartDayLog/deleteBatch", teachingDayLogCtrl.DeleteBatch)
+		group.GET("/teaching/teachingDepartDayLog/queryById", teachingDayLogCtrl.QueryByID)
+		group.GET("/teaching/teachingDepartDayLog/unitViewLog", teachingDayLogCtrl.UnitViewLog)
 		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
 		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
 		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)
@@ -776,6 +792,18 @@ func verifyRouteGuards() {
 	registerGuard("DELETE", "/api/teaching/teachingAdditionalWork/delete", true)
 	registerGuard("DELETE", "/api/teaching/teachingAdditionalWork/deleteBatch", true)
 	registerGuard("GET", "/api/teaching/teachingAdditionalWork/queryById", true)
+
+	// 班级日志域（P2-3）
+	registerGuard("GET", "/api/teaching/teachingDepartDayLog/getReport", true)
+	registerGuard("GET", "/api/teaching/teachingDepartDayLog/getReportGroupByDepart", true)
+	registerGuard("GET", "/api/teaching/teachingDepartDayLog/getReportGroupByMonth", true)
+	registerGuard("GET", "/api/teaching/teachingDepartDayLog/list", true)
+	registerGuard("POST", "/api/teaching/teachingDepartDayLog/add", true)
+	registerGuard("PUT", "/api/teaching/teachingDepartDayLog/edit", true)
+	registerGuard("DELETE", "/api/teaching/teachingDepartDayLog/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingDepartDayLog/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingDepartDayLog/queryById", true)
+	registerGuard("GET", "/api/teaching/teachingDepartDayLog/unitViewLog", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
