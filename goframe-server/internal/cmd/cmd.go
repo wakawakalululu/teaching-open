@@ -615,7 +615,7 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		wireP2_6Domains(group, registerGuard, svcSSPkg.New())
 
 		// P2-8 收尾域：SysUserAgent（syscrud）+ ng-alain（Angular 辅助）
-		wireUserAgentAndNgAlain(group, registerGuard)
+		wireUserAgentAndNgAlain(group, registerGuard, svcPermission.New())
 
 		// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
 		for _, exBase := range excelxBases {

@@ -7,11 +7,12 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/syscrud"
+	svcPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 	svcSC "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/syscrud"
 )
 
 // wireUserAgentAndNgAlain 装配 SysUserAgent CRUD 与 ng-alain 辅助端点。
-func wireUserAgentAndNgAlain(group *ghttp.RouterGroup, guard func(method, path string, requireAuth bool),
+func wireUserAgentAndNgAlain(group *ghttp.RouterGroup, guard func(method, path string, requireAuth bool), permSvc *svcPerm.Service,
 ) {
 	ua := syscrud.NewDomain(svcSC.TableDef{
 		Table: "sys_user_agent",
@@ -26,7 +27,7 @@ func wireUserAgentAndNgAlain(group *ghttp.RouterGroup, guard func(method, path s
 	group.GET("/sys/sysUserAgent/queryById", ua.QueryByID)
 	group.GET("/sys/sysUserAgent/queryByUserName", ua.QueryByUserName)
 
-	group.GET("/sys/ng-alain/getAppData", func(r *ghttp.Request) { syscrud.NgAlainAppData(r) })
+	group.GET("/sys/ng-alain/getAppData", func(r *ghttp.Request) { syscrud.NgAlainAppDataFilled(r, permSvc) })
 	group.GET("/sys/ng-alain/getDictItems/{dictCode}", func(r *ghttp.Request) {
 		syscrud.NgAlainDictItems(r, r.Get("dictCode").String())
 	})
