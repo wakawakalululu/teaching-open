@@ -78,6 +78,10 @@ type SiteConfig struct {
 	FilePreview string
 	// OwID ow365 预览应用 id（FilePreview=ow365 时输出到前端）。
 	OwID string
+	// OwKey ow365 预览加密 key（DES 前 8 字节；"??" 为未配置禁用态）。
+	OwKey string
+	// OwIv ow365 预览加密 iv（8 字节；长度非 8 等价禁用）。
+	OwIv string
 }
 
 // LogisticsConfig 运行环境标识。
@@ -133,6 +137,8 @@ func Load() (*Config, error) {
 	cfg.Site.QiniuDomain = env("QINIU_DOMAIN", "")
 	cfg.Site.FilePreview = env("FILE_PREVIEW", "")
 	cfg.Site.OwID = env("OW365_ID", "")
+	cfg.Site.OwKey = env("OW365_KEY", "??")
+	cfg.Site.OwIv = env("OW365_IV", "")
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err

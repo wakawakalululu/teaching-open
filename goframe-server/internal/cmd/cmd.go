@@ -15,6 +15,7 @@ import (
 	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
 	ctrlCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/course"
+	ctrlCourseUnit "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/courseunit"
 	ctrlDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/depart"
 	ctrlDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departpermission"
 	ctrlDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departrole"
@@ -34,6 +35,7 @@ import (
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
 	svcCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/course"
+	svcCourseUnit "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/courseunit"
 	svcDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/depart"
 	svcDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departpermission"
 	svcDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departrole"
@@ -140,6 +142,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	// P1 业务域：课程 / 门户用户上下文（_url 注入依赖站点静态域名与上传类型）
 	courseSvc := svcCourse.New(cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType)
 	courseCtrl := ctrlCourse.New(courseSvc)
+	courseUnitCtrl := ctrlCourseUnit.New(svcCourseUnit.New(cfg.Site.StaticDomain,
+		cfg.Site.QiniuDomain, cfg.Site.UploadType, cfg.Site.FilePreview,
+		cfg.Site.OwKey, cfg.Site.OwIv))
 	teachingUserCtrl := ctrlTeachingUser.New(svcTeachingUser.New())
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
@@ -362,6 +367,17 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/teaching/user/getUserRootDept", teachingUserCtrl.UserRootDept)
 		group.PUT("/teaching/user/edit", teachingUserCtrl.Edit)
 
+		// 课程单元域（P1-2）
+		group.GET("/teaching/teachingCourseUnit/mineUnit", courseUnitCtrl.MineUnit)
+		group.GET("/teaching/teachingCourseUnit/list", courseUnitCtrl.List)
+		group.GET("/teaching/teachingCourseUnit/getUnitWorkInfo", courseUnitCtrl.GetUnitWorkInfo)
+		group.POST("/teaching/teachingCourseUnit/add", courseUnitCtrl.Add)
+		group.PUT("/teaching/teachingCourseUnit/edit", courseUnitCtrl.Edit)
+		group.PUT("/teaching/teachingCourseUnit/editBatch", courseUnitCtrl.EditBatch)
+		group.DELETE("/teaching/teachingCourseUnit/delete", courseUnitCtrl.Delete)
+		group.DELETE("/teaching/teachingCourseUnit/deleteBatch", courseUnitCtrl.DeleteBatch)
+		group.GET("/teaching/teachingCourseUnit/queryById", courseUnitCtrl.QueryById)
+
 		// 用户角色分配域（P0-3）
 		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
 		group.GET("/sys/user/userRoleList", userRoleCtrl.UserRoleList)
@@ -537,6 +553,17 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/teaching/user/getUserRootDept", true)
 	registerGuard("POST", "/api/teaching/user/getUserRootDept", true)
 	registerGuard("PUT", "/api/teaching/user/edit", true)
+
+	// 课程单元域（P1-2）
+	registerGuard("GET", "/api/teaching/teachingCourseUnit/mineUnit", true)
+	registerGuard("GET", "/api/teaching/teachingCourseUnit/list", true)
+	registerGuard("GET", "/api/teaching/teachingCourseUnit/getUnitWorkInfo", true)
+	registerGuard("POST", "/api/teaching/teachingCourseUnit/add", true)
+	registerGuard("PUT", "/api/teaching/teachingCourseUnit/edit", true)
+	registerGuard("PUT", "/api/teaching/teachingCourseUnit/editBatch", true)
+	registerGuard("DELETE", "/api/teaching/teachingCourseUnit/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingCourseUnit/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingCourseUnit/queryById", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
