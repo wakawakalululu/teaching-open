@@ -275,7 +275,7 @@ func (s *Service) DoReleaseData(ctx context.Context, id, operatorName string) er
 	}
 	// msgType=ALL 时全员广播（对齐 Java webSocket.sendAllMessage；USER 类型
 	// 广播对象为标记行用户——Go 简化为仅 ALL 广播，文档化）
-	if broadcastTopic != nil && row.MsgType == msgTypeAll {
+	if row.MsgType == msgTypeAll {
 		broadcastTopic(id, row.Titile)
 	}
 	return nil

@@ -7,7 +7,7 @@ import (
 )
 
 // Handler 返回 WebSocket 升级与消息循环的 HTTP 处理器
-//（anon——ShiroConfig.java:129 /websocket/** anon）。
+// （anon——ShiroConfig.java:129 /websocket/** anon）。
 // Java 消息 JSON 形状：{cmd, msgId, txt}（WebsocketConst）。
 func (h *Hub) Handler(r *ghttp.Request) {
 	userID := r.Get("userId").String()
