@@ -26,6 +26,7 @@ import (
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
 	ctrlQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/qiniu"
 	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
+	ctrlScratch "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/scratch"
 	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
 	ctrlSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sysfile"
 	ctrlTeachingDayLog "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingdaylog"
@@ -54,6 +55,7 @@ import (
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
+	svcScratch "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/scratch"
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
 	svcSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysfile"
 	svcTeachingDayLog "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingdaylog"
@@ -183,6 +185,10 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	additionalWorkCtrl := ctrlAdditionalWork.New(svcAdditionalWork.New(cfg.Security.RedisEnabled))
 	// P2 业务域：班级日志（计数行 upsert 与聚合报表）
 	teachingDayLogCtrl := ctrlTeachingDayLog.New(svcTeachingDayLog.New(cfg.Security.RedisEnabled))
+	// P2 业务域：Scratch 素材库/背包（背包内容本地存储，七牛上传为文档化待补齐）
+	scratchCtrl := ctrlScratch.New(svcScratch.New(cfg.Security.RedisEnabled,
+		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType,
+		cfg.Storage.LocalRoot))
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -512,6 +518,21 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.DELETE("/teaching/teachingDepartDayLog/deleteBatch", teachingDayLogCtrl.DeleteBatch)
 		group.GET("/teaching/teachingDepartDayLog/queryById", teachingDayLogCtrl.QueryByID)
 		group.GET("/teaching/teachingDepartDayLog/unitViewLog", teachingDayLogCtrl.UnitViewLog)
+
+		// Scratch 素材库域（P2-4）
+		group.GET("/teaching/teachingScratchAssets/list", scratchCtrl.List)
+		group.POST("/teaching/teachingScratchAssets/add", scratchCtrl.AssetAdd)
+		group.PUT("/teaching/teachingScratchAssets/edit", scratchCtrl.AssetEdit)
+		group.DELETE("/teaching/teachingScratchAssets/delete", scratchCtrl.AssetDelete)
+		group.DELETE("/teaching/teachingScratchAssets/deleteBatch", scratchCtrl.AssetDeleteBatch)
+		group.GET("/teaching/teachingScratchAssets/queryById", scratchCtrl.AssetQueryByID)
+		group.GET("/teaching/teachingScratchAssets/getScratchAssets", scratchCtrl.GetScratchAssets)
+
+		// Scratch 背包域（P2-4）
+		group.GET("/teaching/scratch/backpack/content", scratchCtrl.BackpackContent)
+		group.POST("/teaching/scratch/backpack/save", scratchCtrl.BackpackSave)
+		group.DELETE("/teaching/scratch/backpack/delete", scratchCtrl.BackpackDelete)
+		group.GET("/teaching/scratch/backpack/getFile/*filename", scratchCtrl.BackpackGetFile)
 		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
 		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
 		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)
@@ -804,6 +825,21 @@ func verifyRouteGuards() {
 	registerGuard("DELETE", "/api/teaching/teachingDepartDayLog/deleteBatch", true)
 	registerGuard("GET", "/api/teaching/teachingDepartDayLog/queryById", true)
 	registerGuard("GET", "/api/teaching/teachingDepartDayLog/unitViewLog", true)
+
+	// Scratch 素材库域（P2-4）
+	registerGuard("GET", "/api/teaching/teachingScratchAssets/list", true)
+	registerGuard("POST", "/api/teaching/teachingScratchAssets/add", true)
+	registerGuard("PUT", "/api/teaching/teachingScratchAssets/edit", true)
+	registerGuard("DELETE", "/api/teaching/teachingScratchAssets/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingScratchAssets/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingScratchAssets/queryById", true)
+	registerGuard("GET", "/api/teaching/teachingScratchAssets/getScratchAssets", true)
+
+	// Scratch 背包域（P2-4）
+	registerGuard("GET", "/api/teaching/scratch/backpack/content", true)
+	registerGuard("POST", "/api/teaching/scratch/backpack/save", true)
+	registerGuard("DELETE", "/api/teaching/scratch/backpack/delete", true)
+	registerGuard("GET", "/api/teaching/scratch/backpack/getFile/*filename", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
