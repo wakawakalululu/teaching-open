@@ -77,6 +77,7 @@ import (
 	svcUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userdepart"
 	svcUserReg "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userreg"
 	svcUserRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userrole"
+	svcWS "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/ws"
 	// svcQiniu 以值配置注入控制器（无状态服务）
 	svcQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/qiniu"
 )
@@ -194,6 +195,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	teachingNewsCtrl := ctrlTeachingNews.New(svcTeachingNews.New())
 	additionalWorkCtrl := ctrlAdditionalWork.New(svcAdditionalWork.New(cfg.Security.RedisEnabled))
 	// P2 业务域：班级日志（计数行 upsert 与聚合报表）
+	// WebSocket 实时推送中心（anon 端点 + doReleaseData 广播）
+	wsHub := svcWS.New()
 	teachingDayLogCtrl := ctrlTeachingDayLog.New(svcTeachingDayLog.New(cfg.Security.RedisEnabled))
 	// P2 业务域：登录验证码（anon，Redis/内存双态 600s TTL）
 	captchaCtrl := ctrlCaptcha.New(svcCaptcha.New(cfg.Security.RedisEnabled))
@@ -213,6 +216,7 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		cfg.Storage.LocalRoot))
 	// P2 业务域：系统通告/发送记录
 	announcementCtrl := ctrlAnnouncement.New(svcAnnouncement.New())
+	svcAnnouncement.SetBroadcaster(wsHub)
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -283,6 +287,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		// 登录验证码域 anon（登录页未登录可调）
 		group.GET("/sys/randomImage/{key}", captchaCtrl.RandomImage)
 		group.POST("/sys/checkCaptcha", captchaCtrl.CheckCaptcha)
+		// WebSocket 实时推送 anon（ShiroConfig.java:129）——Java 消息 JSON 形状
+		group.GET("/websocket/{userId}", wsHub.Handler)
 		// 手机登录/加密参数 anon
 		group.POST("/sys/phoneLogin", loginCtrl.PhoneLogin)
 		group.GET("/sys/getEncryptedString", loginCtrl.GetEncryptedString)
@@ -1022,6 +1028,7 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/sys/user/passwordChange", false)
 	registerGuard("GET", "/api/sys/randomImage/{key}", false)
 	registerGuard("POST", "/api/sys/checkCaptcha", false)
+	registerGuard("GET", "/api/websocket/{userId}", false)
 
 	// 用户核心 CRUD 域（P0-3）
 	registerGuard("GET", "/api/sys/user/list", true)
