@@ -140,6 +140,14 @@ go run .
 | POST | `/api/sys/user/register` | 注册（allowReg 开关 + 唯一性 + 验证码校验；新账号 bcrypt） | 否（对齐 Shiro anon） |
 | POST | `/api/sys/user/phoneVerification` | 忘记密码：手机号+验证码校验 | 否（对齐 Shiro anon） |
 | GET | `/api/sys/user/passwordChange` | 忘记密码：改密（username/password/smscode/phone） | 否（对齐 Shiro anon） |
+| GET | `/api/sys/role/list` | 角色分页（roleName/roleCode/description 模糊 + roleLevel 精确 + createTime 区间；排序列白名单，无默认排序） | 是 |
+| POST/PUT | `/api/sys/role/add` / `edit` | 角色新增/编辑（admin 角色；edit 先查存在性；MP 非空字段更新语义） | 是 |
+| DELETE | `/api/sys/role/delete` / `deleteBatch` | 角色删除（物理级联：sys_user_role → sys_role_permission → sys_role，单事务） | 是 |
+| GET | `/api/sys/role/queryById` / `queryall` / `queryMySubRole` | 角色详情 / 全量下拉 / 当前用户可分配角色（admin/dev 全量，否则 role_level 严格小于自身） | 是 |
+| GET | `/api/sys/role/checkRoleCode` | 编码唯一性校验（result 恒为 true，冲突走 success+message） | 是 |
+| GET | `/api/sys/role/queryTreeList` | 菜单权限树（del_flag=0 + sort_no 升序）{treeList, ids} | 是 |
+| GET | `/api/sys/role/datarule/:permissionId/:roleId` | 角色的菜单数据规则 + drChecked（尾逗号去一） | 是 |
+| POST | `/api/sys/role/datarule` | 保存数据规则勾选（update-only，关系缺失报「请先保存角色菜单权限!」） | 是 |
 
 > P0-1 域（字典/分类/配置）契约对齐 Java V2.8 Controller。暂未迁移：Excel
 > 导入导出（`exportXls`/`importExcel`）、带过滤条件的表字典（4 段式 dictCode，
@@ -151,6 +159,14 @@ go run .
 > 有意安全加固偏差：新账号一律 bcrypt（Java 为可逆 DES）；短信验证码 fail-closed
 > 校验（REDIS_ENABLED=false 时进程内存储兜底）；排序列白名单 + 列集合校验；
 > 验证码落日志仅限开发环境。
+
+> P0-4a 域（角色管理，13 路由/12 端点）契约对齐 Java V2.8 SysRoleController。
+> 暂未迁移：`exportXls`/`importExcel`（与 P0-1/P0-3 Excel 决策一致）。
+> 有意偏差（注释文档化）：add/edit/delete/deleteBatch 补齐 admin 角色显式校验
+> （对齐 Java @RequiresRoles 违规 → code=510 话术）；create_by/update_by 不写
+> （Java 无自动填充，行为一致）；角色编码唯一性由 DB 唯一键兜底，冲突统一
+> 「操作失败」（Java catch 同款话术）；checkRoleCode 的 code=0/result=true
+> 原形状逐字段保留。
 
 ### 运维工具（`tools/`）
 
@@ -176,9 +192,9 @@ go run .
 
 ## 待办
 
-- P0-1/P0-2/P0-3 已迁移（P0-3：用户管理 32 端点），待 sqlpub 真实库回归
+- P0-1/P0-2/P0-3/P0-4a 已迁移（P0-4a：角色管理域），待 sqlpub 真实库回归
   （登录 → 用户列表增删改查 → 角色分配 → 部门关联）。
-- 未实现全部 495 个业务端点（下一批：P0-4 角色/权限/部门 CRUD）。
+- 未实现全部 495 个业务端点（下一批：P0-4b 菜单/权限 CRUD + P0-4c 部门域）。
 - 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
   仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
 - 短信通道（阿里云 dysmsapi）未接入：验证码仅落日志（开发环境），生产接入时须移除该日志。

@@ -17,6 +17,7 @@ import (
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
+	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
 	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
 	ctrlUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/useraux"
 	ctrlUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/usercore"
@@ -30,6 +31,7 @@ import (
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
+	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
 	svcUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/useraux"
 	svcUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/usercore"
@@ -118,6 +120,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	loginCtrl := ctrlLogin.New(loginSvc)
 	// P0-2 业务域：菜单/权限
 	permissionCtrl := ctrlPermission.New(svcPermission.New())
+	// P0-4 业务域：角色管理（add/edit/delete 域内做 admin 角色校验）
+	roleCtrl := ctrlRole.New(svcRole.New())
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -245,6 +249,21 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		// 菜单/权限域（P0-2）
 		group.GET("/sys/permission/getUserPermissionByToken", permissionCtrl.GetUserPermissionByToken)
 
+		// 角色管理域（P0-4a）
+		group.GET("/sys/role/list", roleCtrl.List)
+		group.POST("/sys/role/add", roleCtrl.Add)
+		group.PUT("/sys/role/edit", roleCtrl.Edit)
+		group.POST("/sys/role/edit", roleCtrl.Edit)
+		group.DELETE("/sys/role/delete", roleCtrl.Delete)
+		group.DELETE("/sys/role/deleteBatch", roleCtrl.DeleteBatch)
+		group.GET("/sys/role/queryById", roleCtrl.QueryById)
+		group.GET("/sys/role/queryall", roleCtrl.QueryAll)
+		group.GET("/sys/role/queryMySubRole", roleCtrl.QueryMySubRole)
+		group.GET("/sys/role/checkRoleCode", roleCtrl.CheckRoleCode)
+		group.GET("/sys/role/queryTreeList", roleCtrl.QueryTreeList)
+		group.GET("/sys/role/datarule/:permissionId/:roleId", roleCtrl.DataruleList)
+		group.POST("/sys/role/datarule", roleCtrl.DataruleSave)
+
 		// 用户角色分配域（P0-3）
 		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
 		group.GET("/sys/user/userRoleList", userRoleCtrl.UserRoleList)
@@ -327,6 +346,21 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/config/saveTenantConfig", true)
 	// 菜单/权限域（P0-2）
 	registerGuard("GET", "/api/sys/permission/getUserPermissionByToken", true)
+
+	// 角色管理域（P0-4a；add/edit/delete/deleteBatch 服务内含 admin 校验）
+	registerGuard("GET", "/api/sys/role/list", true)
+	registerGuard("POST", "/api/sys/role/add", true)
+	registerGuard("PUT", "/api/sys/role/edit", true)
+	registerGuard("POST", "/api/sys/role/edit", true)
+	registerGuard("DELETE", "/api/sys/role/delete", true)
+	registerGuard("DELETE", "/api/sys/role/deleteBatch", true)
+	registerGuard("GET", "/api/sys/role/queryById", true)
+	registerGuard("GET", "/api/sys/role/queryall", true)
+	registerGuard("GET", "/api/sys/role/queryMySubRole", true)
+	registerGuard("GET", "/api/sys/role/checkRoleCode", true)
+	registerGuard("GET", "/api/sys/role/queryTreeList", true)
+	registerGuard("GET", "/api/sys/role/datarule/:permissionId/:roleId", true)
+	registerGuard("POST", "/api/sys/role/datarule", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)

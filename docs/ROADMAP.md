@@ -23,7 +23,8 @@
 | P0-1 字典/分类/配置 | ✅ 完成并实测 | 36 端点契约对齐 V2.8；字典/表字典/分类真实库抽查通过 |
 | P0-2 用户信息/菜单/权限 | ✅ 完成并实测 | 登录响应 sysAllDictItems（40 字典）+ 菜单树 menu=23/auth=3/allAuth=10 |
 | P0-3 用户管理 CRUD | ✅ 完成 | 32 端点：核心 CRUD + 角色分配 + 部门关联 + 回收站 + 注册/找回密码（见迁移说明） |
-| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~80 个（登录链路 + P0-1 + P0-2 + P0-3） |
+| P0-4a 角色管理域 | ✅ 完成并过 Linux 门槛 | 12 端点/13 路由：CRUD（admin 校验）+ queryall/queryMySubRole/checkRoleCode/queryTreeList + datarule 双端点（见迁移说明） |
+| 全部 495 个业务端点 | 🔄 进行中 | 已迁移 ~93 个（登录链路 + P0-1 + P0-2 + P0-3 + P0-4a） |
 
 ---
 
@@ -56,7 +57,20 @@
 | P0-1 | 字典 / 分类 / 站点配置 | ~15 | ✅ 已迁移（36 端点，2026-11-21）：`queryAllDictItems`/表字典/分类树/租户配置 |
 | P0-2 | 当前用户信息 / 菜单 / 权限 | ~12 | `sys/user/info`、`sys/permission/getUserPermissionByToken` |
 | P0-3 | 用户管理 CRUD | ~20 | ✅ 已迁移（32 端点，2026-11-21）：核心 CRUD / 角色分配 / 部门关联 / 回收站 / 注册找回密码 |
-| P0-4 | 角色 / 权限 / 部门 CRUD | ~30 | RBAC 完整性 |
+| P0-4 | 角色 / 权限 / 部门 CRUD | ~30 | RBAC 完整性；**拆三波次**：P0-4a 角色域 ✅（2026-11-21）→
+  P0-4b 菜单/权限 CRUD + 角色授权 + 数据规则 → P0-4c 部门/部门角色/部门权限 |
+
+> P0-4a 迁移说明（2026-11-21）：
+> - 12 端点/13 路由（edit 在 Java 同时接受 PUT/POST）；exportXls/importExcel 未迁移；
+> - add/edit/delete/deleteBatch 显式 admin 角色校验（对齐 @RequiresRoles，
+>   违规返回 Java 全局异常处理器同款 code=510「没有权限，请联系管理员授权」）；
+> - delete 为物理三级联（sys_user_role → sys_role_permission → sys_role），
+>   单删/批删共用同一事务实现；sys_role 无 del_flag；
+> - datarule GET 的 drChecked 去末尾一个逗号、datarule POST 为 update-only
+>   （关系缺失报「请先保存角色菜单权限!」，多行命中报「保存失败」对齐 getOne throwEx）；
+> - checkRoleCode 的 result 恒 true + 冲突 code=0 原形状保留；list 排序列白名单
+>   + 无默认 ORDER BY（对齐 Java）；树构建/冲突判定/排序白名单/drChecked 均有零 DB 单测；
+> - create_by/update_by 不写（Java 无 MetaObjectHandler 自动填充，行为一致）。
 
 > 本地完整运行环境（2026-11-21 实测通过）：
 > - 便携版 MariaDB 11.4.3（Temp 目录）+ `api/db/teachingopen2.8.sql` 全量导入
