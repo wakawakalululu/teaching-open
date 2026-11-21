@@ -29,6 +29,7 @@ import (
 	ctrlSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sysfile"
 	ctrlTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingmenu"
 	ctrlTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachinguser"
+	ctrlTeachingWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingwork"
 	ctrlUpload "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/upload"
 	ctrlUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/useraux"
 	ctrlUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/usercore"
@@ -53,6 +54,7 @@ import (
 	svcSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysfile"
 	svcTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingmenu"
 	svcTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachinguser"
+	svcTeachingWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingwork"
 	svcUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/useraux"
 	svcUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/usercore"
 	svcUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userdepart"
@@ -167,6 +169,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		Bucket:    cfg.Qiniu.Bucket,
 	})
 	uploadCtrl := ctrlUpload.New(cfg.Site.UploadType, cfg.Storage.LocalRoot)
+	// P2 业务域：作业（标签/点赞/班级日志计数走 KV 存储，键格式兼容灰度双写）
+	teachingWorkCtrl := ctrlTeachingWork.New(svcTeachingWork.New(cfg.Security.RedisEnabled,
+		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType))
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -241,6 +246,13 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/teaching/menu/getUserMenu", teachingMenuCtrl.GetUserMenu)
 		// 本地静态预览 anon（ShiroConfig.java:88 图片预览与下载不限 token）
 		group.GET("/sys/common/static/*path", uploadCtrl.Static)
+		// 作业域 anon（ShiroConfig.java:152-157）
+		group.GET("/teaching/teachingWork/userInfo", teachingWorkCtrl.GetUserInfo)
+		group.GET("/teaching/teachingWork/studentWorkInfo", teachingWorkCtrl.GetStudentWorkInfo)
+		group.GET("/teaching/teachingWork/greatWork", teachingWorkCtrl.GreatWorkList)
+		group.GET("/teaching/teachingWork/starWork", teachingWorkCtrl.StarWork)
+		group.GET("/teaching/teachingWork/leaderboard", teachingWorkCtrl.Leaderboard)
+		group.GET("/teaching/teachingWork/getWorkComments", teachingWorkCtrl.GetWorkComments)
 	})
 
 	// 受保护路由
@@ -442,6 +454,24 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 
 		// 本地上传（P1-4）
 		group.POST("/sys/common/upload", uploadCtrl.Upload)
+
+		// 作业域（P2-1）
+		group.GET("/teaching/teachingWork/mine", teachingWorkCtrl.Mine)
+		group.GET("/teaching/teachingWork/mineAdditionalWork", teachingWorkCtrl.MineAdditionalWork)
+		group.POST("/teaching/teachingWork/submit", teachingWorkCtrl.Submit)
+		group.POST("/teaching/teachingWork/sendWork", teachingWorkCtrl.SendWork)
+		group.GET("/teaching/teachingWork/list", teachingWorkCtrl.WorkList)
+		group.POST("/teaching/teachingWork/add", teachingWorkCtrl.WorkAdd)
+		group.PUT("/teaching/teachingWork/edit", teachingWorkCtrl.WorkEdit)
+		group.DELETE("/teaching/teachingWork/delete", teachingWorkCtrl.WorkDelete)
+		group.DELETE("/teaching/teachingWork/deleteBatch", teachingWorkCtrl.WorkDeleteBatch)
+		group.GET("/teaching/teachingWork/queryById", teachingWorkCtrl.WorkQueryById)
+		group.GET("/teaching/teachingWork/queryTeachingWorkCorrectByMainId", teachingWorkCtrl.QueryCorrectsByMainID)
+		group.GET("/teaching/teachingWork/queryTeachingWorkCommentByMainId", teachingWorkCtrl.QueryCommentsByMainID)
+		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
+		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
+		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)
+		group.DELETE("/teaching/teachingWork/delWorkTag", teachingWorkCtrl.DelWorkTag)
 
 		// 用户角色分配域（P0-3）
 		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
@@ -672,6 +702,32 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/sys/common/upload", true)
 	// 本地静态预览为 anon（ShiroConfig.java:88），非写操作不强制登记
 	registerGuard("GET", "/api/sys/common/static/*path", false)
+
+	// 作业域（P2-1）
+	registerGuard("GET", "/api/teaching/teachingWork/mine", true)
+	registerGuard("GET", "/api/teaching/teachingWork/mineAdditionalWork", true)
+	registerGuard("POST", "/api/teaching/teachingWork/submit", true)
+	registerGuard("POST", "/api/teaching/teachingWork/sendWork", true)
+	registerGuard("GET", "/api/teaching/teachingWork/list", true)
+	registerGuard("POST", "/api/teaching/teachingWork/add", true)
+	registerGuard("PUT", "/api/teaching/teachingWork/edit", true)
+	registerGuard("DELETE", "/api/teaching/teachingWork/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingWork/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingWork/queryById", true)
+	registerGuard("GET", "/api/teaching/teachingWork/queryTeachingWorkCorrectByMainId", true)
+	registerGuard("GET", "/api/teaching/teachingWork/queryTeachingWorkCommentByMainId", true)
+	registerGuard("POST", "/api/teaching/teachingWork/saveComment", true)
+	registerGuard("GET", "/api/teaching/teachingWork/getWorkTags", true)
+	registerGuard("GET", "/api/teaching/teachingWork/setWorkTag", true)
+	registerGuard("DELETE", "/api/teaching/teachingWork/delWorkTag", true)
+
+	// 作业域 anon（ShiroConfig.java:152-157）
+	registerGuard("GET", "/api/teaching/teachingWork/userInfo", false)
+	registerGuard("GET", "/api/teaching/teachingWork/studentWorkInfo", false)
+	registerGuard("GET", "/api/teaching/teachingWork/greatWork", false)
+	registerGuard("GET", "/api/teaching/teachingWork/starWork", false)
+	registerGuard("GET", "/api/teaching/teachingWork/leaderboard", false)
+	registerGuard("GET", "/api/teaching/teachingWork/getWorkComments", false)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
