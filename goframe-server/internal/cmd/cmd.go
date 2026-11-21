@@ -26,6 +26,7 @@ import (
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlExcelx "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/excelx"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
+	ctrlMessage "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/message"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
 	ctrlQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/qiniu"
 	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
@@ -59,6 +60,7 @@ import (
 	svcDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departrole"
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
+	svcMessage "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/message"
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
 	svcScratch "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/scratch"
@@ -195,6 +197,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	teachingDayLogCtrl := ctrlTeachingDayLog.New(svcTeachingDayLog.New(cfg.Security.RedisEnabled))
 	// P2 业务域：登录验证码（anon，Redis/内存双态 600s TTL）
 	captchaCtrl := ctrlCaptcha.New(svcCaptcha.New(cfg.Security.RedisEnabled))
+	// P2 业务域：消息模板/发送记录（表存在于 V2.8 DDL L821/L843）
+	messageCtrl := ctrlMessage.New(svcMessage.New())
 	// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
 	excelxCtrl := ctrlExcelx.New(func(plain string) string {
 		h, herr := passwd.Hash(plain)
@@ -584,6 +588,23 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/sys/sysAnnouncementSend/getMyAnnouncementSend", announcementCtrl.GetMyAnnouncementSend)
 		group.PUT("/sys/sysAnnouncementSend/readAll", announcementCtrl.ReadAll)
 
+		// 消息模板域（P2-7）
+		group.GET("/message/sysMessageTemplate/list", messageCtrl.TemplateList)
+		group.POST("/message/sysMessageTemplate/add", messageCtrl.TemplateAdd)
+		group.PUT("/message/sysMessageTemplate/edit", messageCtrl.TemplateEdit)
+		group.DELETE("/message/sysMessageTemplate/delete", messageCtrl.TemplateDelete)
+		group.DELETE("/message/sysMessageTemplate/deleteBatch", messageCtrl.TemplateDeleteBatch)
+		group.GET("/message/sysMessageTemplate/queryById", messageCtrl.TemplateQueryByID)
+		group.POST("/message/sysMessageTemplate/sendMsg", messageCtrl.SendMsg)
+
+		// 消息发送记录域（P2-7）
+		group.GET("/message/sysMessage/list", messageCtrl.SmsList)
+		group.POST("/message/sysMessage/add", messageCtrl.SmsAdd)
+		group.PUT("/message/sysMessage/edit", messageCtrl.SmsEdit)
+		group.DELETE("/message/sysMessage/delete", messageCtrl.SmsDelete)
+		group.DELETE("/message/sysMessage/deleteBatch", messageCtrl.SmsDeleteBatch)
+		group.GET("/message/sysMessage/queryById", messageCtrl.SmsQueryByID)
+
 		// P2-6 泛型域与特殊端点（在闭包内以 group/guard 装配）
 		wireP2_6Domains(group, registerGuard, svcSSPkg.New())
 
@@ -783,6 +804,36 @@ func verifyRouteGuards() {
 	registerGuard("PUT", "/api/sys/selectDepart", true)
 	registerGuard("GET", "/api/sys/loginfo", true)
 	registerGuard("GET", "/api/sys/visitInfo", true)
+
+	// 消息域（P2-7）
+	registerGuard("GET", "/api/message/sysMessageTemplate/list", true)
+	registerGuard("POST", "/api/message/sysMessageTemplate/add", true)
+	registerGuard("PUT", "/api/message/sysMessageTemplate/edit", true)
+	registerGuard("DELETE", "/api/message/sysMessageTemplate/delete", true)
+	registerGuard("DELETE", "/api/message/sysMessageTemplate/deleteBatch", true)
+	registerGuard("GET", "/api/message/sysMessageTemplate/queryById", true)
+	registerGuard("POST", "/api/message/sysMessageTemplate/sendMsg", true)
+	registerGuard("GET", "/api/message/sysMessage/list", true)
+	registerGuard("POST", "/api/message/sysMessage/add", true)
+	registerGuard("PUT", "/api/message/sysMessage/edit", true)
+	registerGuard("DELETE", "/api/message/sysMessage/delete", true)
+	registerGuard("DELETE", "/api/message/sysMessage/deleteBatch", true)
+	registerGuard("GET", "/api/message/sysMessage/queryById", true)
+
+	// 消息域（P2-7）
+	registerGuard("GET", "/api/message/sysMessageTemplate/list", true)
+	registerGuard("POST", "/api/message/sysMessageTemplate/add", true)
+	registerGuard("PUT", "/api/message/sysMessageTemplate/edit", true)
+	registerGuard("DELETE", "/api/message/sysMessageTemplate/delete", true)
+	registerGuard("DELETE", "/api/message/sysMessageTemplate/deleteBatch", true)
+	registerGuard("GET", "/api/message/sysMessageTemplate/queryById", true)
+	registerGuard("POST", "/api/message/sysMessageTemplate/sendMsg", true)
+	registerGuard("GET", "/api/message/sysMessage/list", true)
+	registerGuard("POST", "/api/message/sysMessage/add", true)
+	registerGuard("PUT", "/api/message/sysMessage/edit", true)
+	registerGuard("DELETE", "/api/message/sysMessage/delete", true)
+	registerGuard("DELETE", "/api/message/sysMessage/deleteBatch", true)
+	registerGuard("GET", "/api/message/sysMessage/queryById", true)
 	registerGuard("PUT", "/api/sys/user/appEdit", true)
 
 	// 课程单元域（P1-2）
