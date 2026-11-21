@@ -12,6 +12,7 @@ import (
 
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/auth"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/config"
+	ctrlAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/additionalwork"
 	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
 	ctrlCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/course"
@@ -28,6 +29,7 @@ import (
 	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
 	ctrlSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sysfile"
 	ctrlTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingmenu"
+	ctrlTeachingNews "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingnews"
 	ctrlTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachinguser"
 	ctrlTeachingWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingwork"
 	ctrlUpload "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/upload"
@@ -38,6 +40,7 @@ import (
 	ctrlUserRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userrole"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
+	svcAdditionalWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/additionalwork"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
 	svcCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/course"
@@ -53,6 +56,7 @@ import (
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
 	svcSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysfile"
 	svcTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingmenu"
+	svcTeachingNews "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingnews"
 	svcTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachinguser"
 	svcTeachingWork "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingwork"
 	svcUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/useraux"
@@ -172,6 +176,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	// P2 业务域：作业（标签/点赞/班级日志计数走 KV 存储，键格式兼容灰度双写）
 	teachingWorkCtrl := ctrlTeachingWork.New(svcTeachingWork.New(cfg.Security.RedisEnabled,
 		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType))
+	// P2 业务域：资讯（anon 列表/详情）/附加作业
+	teachingNewsCtrl := ctrlTeachingNews.New(svcTeachingNews.New())
+	additionalWorkCtrl := ctrlAdditionalWork.New(svcAdditionalWork.New(cfg.Security.RedisEnabled))
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -253,6 +260,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/teaching/teachingWork/starWork", teachingWorkCtrl.StarWork)
 		group.GET("/teaching/teachingWork/leaderboard", teachingWorkCtrl.Leaderboard)
 		group.GET("/teaching/teachingWork/getWorkComments", teachingWorkCtrl.GetWorkComments)
+		// 资讯域 anon（ShiroConfig.java:160-161）
+		group.GET("/teaching/teachingNews/newsList", teachingNewsCtrl.NewsList)
+		group.GET("/teaching/teachingNews/newsDetail", teachingNewsCtrl.NewsDetail)
 	})
 
 	// 受保护路由
@@ -468,6 +478,24 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/teaching/teachingWork/queryById", teachingWorkCtrl.WorkQueryById)
 		group.GET("/teaching/teachingWork/queryTeachingWorkCorrectByMainId", teachingWorkCtrl.QueryCorrectsByMainID)
 		group.GET("/teaching/teachingWork/queryTeachingWorkCommentByMainId", teachingWorkCtrl.QueryCommentsByMainID)
+
+		// 资讯域（P2-2）
+		group.GET("/teaching/teachingNews/list", teachingNewsCtrl.List)
+		group.POST("/teaching/teachingNews/add", teachingNewsCtrl.Add)
+		group.PUT("/teaching/teachingNews/edit", teachingNewsCtrl.Edit)
+		group.DELETE("/teaching/teachingNews/delete", teachingNewsCtrl.Delete)
+		group.DELETE("/teaching/teachingNews/deleteBatch", teachingNewsCtrl.DeleteBatch)
+		group.GET("/teaching/teachingNews/queryById", teachingNewsCtrl.QueryByID)
+
+		// 附加作业域（P2-2）
+		group.GET("/teaching/teachingAdditionalWork/getWorkInfo", additionalWorkCtrl.GetWorkInfo)
+		group.GET("/teaching/teachingAdditionalWork/list", additionalWorkCtrl.List)
+		group.GET("/teaching/teachingAdditionalWork/teacherList", additionalWorkCtrl.TeacherList)
+		group.POST("/teaching/teachingAdditionalWork/add", additionalWorkCtrl.Add)
+		group.PUT("/teaching/teachingAdditionalWork/edit", additionalWorkCtrl.Edit)
+		group.DELETE("/teaching/teachingAdditionalWork/delete", additionalWorkCtrl.Delete)
+		group.DELETE("/teaching/teachingAdditionalWork/deleteBatch", additionalWorkCtrl.DeleteBatch)
+		group.GET("/teaching/teachingAdditionalWork/queryById", additionalWorkCtrl.QueryByID)
 		group.POST("/teaching/teachingWork/saveComment", teachingWorkCtrl.SaveComment)
 		group.GET("/teaching/teachingWork/getWorkTags", teachingWorkCtrl.GetWorkTags)
 		group.GET("/teaching/teachingWork/setWorkTag", teachingWorkCtrl.SetWorkTag)
@@ -728,6 +756,26 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/teaching/teachingWork/starWork", false)
 	registerGuard("GET", "/api/teaching/teachingWork/leaderboard", false)
 	registerGuard("GET", "/api/teaching/teachingWork/getWorkComments", false)
+
+	// 资讯域（P2-2）
+	registerGuard("GET", "/api/teaching/teachingNews/list", true)
+	registerGuard("POST", "/api/teaching/teachingNews/add", true)
+	registerGuard("PUT", "/api/teaching/teachingNews/edit", true)
+	registerGuard("DELETE", "/api/teaching/teachingNews/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingNews/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingNews/queryById", true)
+	registerGuard("GET", "/api/teaching/teachingNews/newsList", false)
+	registerGuard("GET", "/api/teaching/teachingNews/newsDetail", false)
+
+	// 附加作业域（P2-2）
+	registerGuard("GET", "/api/teaching/teachingAdditionalWork/getWorkInfo", true)
+	registerGuard("GET", "/api/teaching/teachingAdditionalWork/list", true)
+	registerGuard("GET", "/api/teaching/teachingAdditionalWork/teacherList", true)
+	registerGuard("POST", "/api/teaching/teachingAdditionalWork/add", true)
+	registerGuard("PUT", "/api/teaching/teachingAdditionalWork/edit", true)
+	registerGuard("DELETE", "/api/teaching/teachingAdditionalWork/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingAdditionalWork/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingAdditionalWork/queryById", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
