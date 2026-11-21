@@ -9,6 +9,7 @@ import (
 
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/common"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
+	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/page"
 	svcTU "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachinguser"
 )
 
@@ -98,4 +99,54 @@ func (c *Controller) Edit(r *ghttp.Request) {
 		return
 	}
 	common.OKMsg(r, "修改成功!", nil)
+}
+
+// appUserListRes APP 端用户分页响应（SysUser 白名单输出——password/salt
+// 已由 entity json:"-" 隔离）。
+type appUserRow struct {
+	Id           string `json:"id"`
+	Username     string `json:"username"`
+	Realname     string `json:"realname"`
+	Avatar       string `json:"avatar"`
+	Sex          int    `json:"sex"`
+	Phone        string `json:"phone"`
+	OrgCode      string `json:"orgCode"`
+	ActivitiSync int    `json:"activitiSync"`
+}
+
+// AppUserList APP 端用户分页。
+// 契约：GET /teaching/user/appUserList?keyword=&username=&pageNo=&pageSize=。
+func (c *Controller) AppUserList(r *ghttp.Request) {
+	res, err := c.svc.AppUserList(r.Context(), pageParam(r),
+		r.Get("keyword").String(), r.Get("username").String())
+	if err != nil {
+		common.Fail(r, "查询失败")
+		return
+	}
+	common.OK(r, res)
+}
+
+// pageParam 别名（与既有 parsePage 一致）。
+func pageParam(r *ghttp.Request) page.Param {
+	return page.Param{
+		PageNo:   r.Get("pageNo", 1).Int(),
+		PageSize: r.Get("pageSize", 10).Int(),
+	}
+}
+
+// GetUserSectionInfoByToken 用户部分信息（键名对齐 Java Map 输出）。
+// 契约：GET /sys/user/getUserSectionInfoByToken（token 参数忽略——统一走
+// 认证中间件，与 P0-2 getUserPermissionByToken 同款决策）。
+func (c *Controller) GetUserSectionInfoByToken(r *ghttp.Request) {
+	res, err := c.svc.Info(r.Context(), operatorID(r))
+	if err != nil || res.Id == "" {
+		common.Fail(r, "查询失败")
+		return
+	}
+	common.OK(r, map[string]interface{}{
+		"sysUserId":   res.Id,
+		"sysUserCode": res.Username,
+		"sysUserName": res.Realname,
+		"sysOrgCode":  res.OrgCode,
+	})
 }

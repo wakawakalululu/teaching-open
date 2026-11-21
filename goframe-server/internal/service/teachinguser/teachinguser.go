@@ -20,6 +20,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/dao"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/do"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/entity"
+	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/page"
 )
 
 // 业务错误。
@@ -183,4 +184,38 @@ func (s *Service) Edit(ctx context.Context, in EditInput) error {
 		return fmt.Errorf("操作失败: %w", err)
 	}
 	return nil
+}
+
+// AppUserList APP 端用户分页（activitiSync=1 + del_flag=0）。
+//
+// 契约蓝本 SysUserController#appUserList：username 精确优先，否则
+// username/realname 对 keyword 模糊（OR 链）。
+func (s *Service) AppUserList(ctx context.Context, param page.Param, keyword, username string) (*page.Result, error) {
+	cols := dao.SysUser.Columns()
+	m := dao.SysUser.Ctx(ctx).
+		Where(cols.ActivitiSync, 1).
+		Where(cols.DelFlag, 0)
+	if username != "" {
+		m = m.Where(cols.Username, username)
+	} else if keyword != "" {
+		m = m.Where("("+stringLike(cols.Username)+" OR "+stringLike(cols.Realname)+")",
+			"%"+keyword+"%", "%"+keyword+"%")
+	}
+	total, err := m.Count()
+	if err != nil {
+		return nil, fmt.Errorf("统计用户数量失败: %w", err)
+	}
+	if total == 0 {
+		return page.New([]entity.SysUser{}, 0, param.PageNo, param.PageSize), nil
+	}
+	var rows []entity.SysUser
+	if err := m.Page(param.PageNo, param.PageSize).Scan(&rows); err != nil {
+		return nil, fmt.Errorf("查询用户列表失败: %w", err)
+	}
+	return page.New(rows, total, param.PageNo, param.PageSize), nil
+}
+
+// stringLike 占位符 LIKE 片段（列名为代码内常量）。
+func stringLike(col string) string {
+	return col + " LIKE ?"
 }

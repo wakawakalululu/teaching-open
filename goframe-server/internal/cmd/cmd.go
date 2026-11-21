@@ -428,6 +428,7 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/teaching/user/getUserRootDept", teachingUserCtrl.UserRootDept)
 		group.POST("/teaching/user/getUserRootDept", teachingUserCtrl.UserRootDept)
 		group.PUT("/teaching/user/edit", teachingUserCtrl.Edit)
+		group.GET("/teaching/user/appUserList", teachingUserCtrl.AppUserList)
 
 		// 课程单元域（P1-2）
 		group.GET("/teaching/teachingCourseUnit/mineUnit", courseUnitCtrl.MineUnit)
@@ -744,6 +745,7 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/teaching/user/getUserRootDept", true)
 	registerGuard("POST", "/api/teaching/user/getUserRootDept", true)
 	registerGuard("PUT", "/api/teaching/user/edit", true)
+	registerGuard("GET", "/api/teaching/user/appUserList", true)
 
 	// 课程单元域（P1-2）
 	registerGuard("GET", "/api/teaching/teachingCourseUnit/mineUnit", true)
