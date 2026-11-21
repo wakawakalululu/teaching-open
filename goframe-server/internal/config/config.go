@@ -71,6 +71,9 @@ type SiteConfig struct {
 	UploadType string
 	// StaticDomain 静态资源域名。
 	StaticDomain string
+	// QiniuDomain 七牛外链域名（uploadType=qiniu 时 @FileUrl/_url 注入与
+	// 前端展示共用；对齐 Java QiniuConfig.domain）。
+	QiniuDomain string
 	// FilePreview 文件预览方式（空或 ow365）。
 	FilePreview string
 	// OwID ow365 预览应用 id（FilePreview=ow365 时输出到前端）。
@@ -127,6 +130,7 @@ func Load() (*Config, error) {
 
 	cfg.Site.UploadType = env("UPLOAD_TYPE", "local")
 	cfg.Site.StaticDomain = env("STATIC_DOMAIN", "")
+	cfg.Site.QiniuDomain = env("QINIU_DOMAIN", "")
 	cfg.Site.FilePreview = env("FILE_PREVIEW", "")
 	cfg.Site.OwID = env("OW365_ID", "")
 

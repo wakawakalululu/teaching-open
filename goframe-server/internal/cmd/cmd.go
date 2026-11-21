@@ -14,6 +14,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/config"
 	ctrlCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/category"
 	ctrlConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/config"
+	ctrlCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/course"
 	ctrlDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/depart"
 	ctrlDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departpermission"
 	ctrlDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/departrole"
@@ -22,6 +23,7 @@ import (
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
 	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
 	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
+	ctrlTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachinguser"
 	ctrlUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/useraux"
 	ctrlUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/usercore"
 	ctrlUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userdepart"
@@ -31,6 +33,7 @@ import (
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/notify"
 	svcCategory "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/category"
 	svcConfig "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/config"
+	svcCourse "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/course"
 	svcDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/depart"
 	svcDepartPerm "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departpermission"
 	svcDepartRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/departrole"
@@ -39,6 +42,7 @@ import (
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
+	svcTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachinguser"
 	svcUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/useraux"
 	svcUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/usercore"
 	svcUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userdepart"
@@ -58,16 +62,17 @@ var (
 
 // 公开路径白名单（唯一允许绕过认证的入口）。
 var publicPaths = map[string]struct{}{
-	"/api/actuator/health":            {},
-	"/api/sys/login":                  {},
-	"/api/sys/mLogin":                 {},
-	"/api/sys/refreshToken":           {},
-	"/api/sys/sms":                    {},
-	"/api/sys/user/checkOnlyUser":     {},
-	"/api/sys/user/querySysUser":      {},
-	"/api/sys/user/register":          {},
-	"/api/sys/user/phoneVerification": {},
-	"/api/sys/user/passwordChange":    {},
+	"/api/actuator/health":                       {},
+	"/api/sys/login":                             {},
+	"/api/sys/mLogin":                            {},
+	"/api/sys/refreshToken":                      {},
+	"/api/sys/sms":                               {},
+	"/api/sys/user/checkOnlyUser":                {},
+	"/api/sys/user/querySysUser":                 {},
+	"/api/sys/user/register":                     {},
+	"/api/sys/user/phoneVerification":            {},
+	"/api/sys/user/passwordChange":               {},
+	"/api/teaching/teachingCourse/getHomeCourse": {},
 }
 
 // routeGuard 路由守卫登记项。
@@ -132,6 +137,10 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	departCtrl := ctrlDepart.New(svcDepart.New())
 	departRoleCtrl := ctrlDepartRole.New(svcDepartRole.New())
 	departPermCtrl := ctrlDepartPerm.New(svcDepartPerm.New())
+	// P1 业务域：课程 / 门户用户上下文（_url 注入依赖站点静态域名与上传类型）
+	courseSvc := svcCourse.New(cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType)
+	courseCtrl := ctrlCourse.New(courseSvc)
+	teachingUserCtrl := ctrlTeachingUser.New(svcTeachingUser.New())
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -200,6 +209,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/user/register", userRegCtrl.Register)
 		group.POST("/user/phoneVerification", userRegCtrl.PhoneVerification)
 		group.GET("/user/passwordChange", userRegCtrl.PasswordChange)
+		// 课程域 anon（ShiroConfig.java:158 首页未登录可调）
+		group.GET("/teaching/teachingCourse/getHomeCourse", courseCtrl.GetHomeCourse)
 	})
 
 	// 受保护路由
@@ -334,6 +345,22 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/sys/sysDepartPermission/queryDeptRolePermission", departPermCtrl.QueryDeptRolePermission)
 		group.POST("/sys/sysDepartPermission/saveDeptRolePermission", departPermCtrl.SaveDeptRolePermission)
 		group.GET("/sys/sysDepartPermission/queryTreeListForDeptRole", departPermCtrl.QueryTreeListForDeptRole)
+
+		// 课程域（P1-1）
+		group.GET("/teaching/teachingCourse/mineCourse", courseCtrl.MineCourse)
+		group.GET("/teaching/teachingCourse/list", courseCtrl.List)
+		group.POST("/teaching/teachingCourse/add", courseCtrl.Add)
+		group.PUT("/teaching/teachingCourse/edit", courseCtrl.Edit)
+		group.DELETE("/teaching/teachingCourse/delete", courseCtrl.Delete)
+		group.DELETE("/teaching/teachingCourse/deleteBatch", courseCtrl.DeleteBatch)
+		group.GET("/teaching/teachingCourse/queryById", courseCtrl.QueryById)
+
+		// 门户用户上下文域（P1-1；@RequestMapping 无 method → GET/POST 双登记）
+		group.GET("/teaching/user/info", teachingUserCtrl.Info)
+		group.POST("/teaching/user/info", teachingUserCtrl.Info)
+		group.GET("/teaching/user/getUserRootDept", teachingUserCtrl.UserRootDept)
+		group.POST("/teaching/user/getUserRootDept", teachingUserCtrl.UserRootDept)
+		group.PUT("/teaching/user/edit", teachingUserCtrl.Edit)
 
 		// 用户角色分配域（P0-3）
 		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
@@ -493,6 +520,23 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/sys/sysDepartPermission/queryDeptRolePermission", true)
 	registerGuard("POST", "/api/sys/sysDepartPermission/saveDeptRolePermission", true)
 	registerGuard("GET", "/api/sys/sysDepartPermission/queryTreeListForDeptRole", true)
+
+	// 课程域（P1-1）
+	registerGuard("GET", "/api/teaching/teachingCourse/mineCourse", true)
+	registerGuard("GET", "/api/teaching/teachingCourse/getHomeCourse", false)
+	registerGuard("GET", "/api/teaching/teachingCourse/list", true)
+	registerGuard("POST", "/api/teaching/teachingCourse/add", true)
+	registerGuard("PUT", "/api/teaching/teachingCourse/edit", true)
+	registerGuard("DELETE", "/api/teaching/teachingCourse/delete", true)
+	registerGuard("DELETE", "/api/teaching/teachingCourse/deleteBatch", true)
+	registerGuard("GET", "/api/teaching/teachingCourse/queryById", true)
+
+	// 门户用户上下文域（P1-1）
+	registerGuard("GET", "/api/teaching/user/info", true)
+	registerGuard("POST", "/api/teaching/user/info", true)
+	registerGuard("GET", "/api/teaching/user/getUserRootDept", true)
+	registerGuard("POST", "/api/teaching/user/getUserRootDept", true)
+	registerGuard("PUT", "/api/teaching/user/edit", true)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
