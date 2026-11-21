@@ -9,9 +9,11 @@ import (
 	"net/http"
 	"strings"
 
+	"context"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 
+	"github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/common"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/middleware"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/entity"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
@@ -19,12 +21,23 @@ import (
 
 // Controller 登录控制器。
 type Controller struct {
-	svc *login.Service
+	svc    *login.Service
+	smsSvc smsVerifier
+}
+
+// smsVerifier 短信验证码校验接口（由 sms 域实现）。
+type smsVerifier interface {
+	Verify(ctx context.Context, phone, code string) error
 }
 
 // New 构造控制器。
 func New(svc *login.Service) *Controller {
 	return &Controller{svc: svc}
+}
+
+// NewWithSms 构造带短信校验的控制器（phoneLogin 用）。
+func NewWithSms(svc *login.Service, smsSvc smsVerifier) *Controller {
+	return &Controller{svc: svc, smsSvc: smsSvc}
 }
 
 // ok 统一成功响应。
@@ -262,4 +275,101 @@ func maskEmail(e string) string {
 		return "***"
 	}
 	return e[:1] + "***" + e[at:]
+}
+
+// phoneLoginReq POST /sys/phoneLogin 请求体（mobile/captcha）。
+type phoneLoginReq struct {
+	Mobile  string `json:"mobile"`
+	Captcha string `json:"captcha"`
+}
+
+// PhoneLogin 手机验证码登录（anon）。
+// 契约：POST /sys/phoneLogin；错误话术「该用户不存在」/「手机验证码错误」；
+// 成功响应与账号登录同形状（token/refreshToken/userInfo/sysAllDictItems）。
+func (c *Controller) PhoneLogin(r *ghttp.Request) {
+	var in phoneLoginReq
+	if err := r.Parse(&in); err != nil || in.Mobile == "" {
+		common.Fail(r, "该用户不存在")
+		return
+	}
+	if c.smsSvc != nil {
+		if verr := c.smsSvc.Verify(r.Context(), in.Mobile, in.Captcha); verr != nil {
+			common.Fail(r, "手机验证码错误")
+			return
+		}
+	}
+	result, err := c.svc.PhoneLogin(r.Context(), in.Mobile, r.GetClientIp())
+	if err != nil {
+		switch {
+		case errors.Is(err, login.ErrPhoneInvalid):
+			common.Fail(r, "该用户不存在")
+		case errors.Is(err, login.ErrAccountDisabled):
+			common.Fail(r, "账号已被锁定，请联系管理员")
+		default:
+			g.Log().Errorf(r.Context(), "手机登录处理异常 err=%s", err.Error())
+			common.Fail(r, "登录失败，请稍后重试")
+		}
+		return
+	}
+	ok(r, g.Map{
+		"token":           result.Tokens.AccessToken,
+		"refreshToken":    result.Tokens.RefreshToken,
+		"expiresIn":       result.Tokens.ExpiresIn,
+		"userInfo":        publicUser(result.User, result.Roles),
+		"sysAllDictItems": result.DictItems,
+	})
+}
+
+// GetEncryptedString 前端密码 AES 加密参数（anon）。
+// 契约：GET /sys/getEncryptedString → result {key, iv}（jeecg EncryptedString 常量）。
+func (c *Controller) GetEncryptedString(r *ghttp.Request) {
+	common.OK(r, g.Map{
+		"key": "1234567890adbcde",
+		"iv":  "1234567890hjlkew",
+	})
+}
+
+// SelectDepart 登录后选择当前部门。
+// 契约：PUT /sys/selectDepart（body {username?, orgCode}）→ result {userInfo}。
+func (c *Controller) SelectDepart(r *ghttp.Request) {
+	var in struct {
+		Username string `json:"username"`
+		OrgCode  string `json:"orgCode"`
+	}
+	if err := r.Parse(&in); err != nil {
+		common.Fail(r, "请求参数不合法")
+		return
+	}
+	username := in.Username
+	if username == "" {
+		username = r.GetCtxVar(middleware.CtxKeyUsername).String()
+	}
+	res, err := c.svc.SelectDepart(r.Context(), username, in.OrgCode)
+	if err != nil {
+		common.Fail(r, err.Error())
+		return
+	}
+	common.OK(r, g.Map{"userInfo": res})
+}
+
+// LogInfo 首页登录统计（今日/总量/今日IP）。
+// 契约：GET /sys/loginfo；话术「登录成功」。
+func (c *Controller) LogInfo(r *ghttp.Request) {
+	res, err := c.svc.LogInfo(r.Context())
+	if err != nil {
+		common.Fail(r, "操作失败")
+		return
+	}
+	common.OKMsg(r, "登录成功", res)
+}
+
+// VisitInfo 近 7 日访问趋势（键小写化）。
+// 契约：GET /sys/visitInfo。
+func (c *Controller) VisitInfo(r *ghttp.Request) {
+	res, err := c.svc.VisitInfo(r.Context())
+	if err != nil {
+		common.Fail(r, "操作失败")
+		return
+	}
+	common.OK(r, res)
 }

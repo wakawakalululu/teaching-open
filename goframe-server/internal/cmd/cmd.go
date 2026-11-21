@@ -156,9 +156,10 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	dictSvc := svcDict.New()
 	dictCtrl := ctrlDict.New(dictSvc)
 	categoryCtrl := ctrlCategory.New(svcCategory.New())
+	smsSvc := svcSms.New(cfg.Security.RedisEnabled)
 	// 登录链路（依赖字典服务随响应下发全量字典）
 	loginSvc := svcLogin.New(tokens, limiter, feishu, dictSvc)
-	loginCtrl := ctrlLogin.New(loginSvc)
+	loginCtrl := ctrlLogin.NewWithSms(loginSvc, smsSvc)
 	// P0-2 业务域：菜单/权限
 	permissionCtrl := ctrlPermission.New(svcPermission.New())
 	// P0-4 业务域：角色管理（add/edit/delete 域内做 admin 角色校验）
@@ -223,7 +224,6 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	// P0-3 业务域：用户核心 CRUD；注册/找回密码自服务（短信验证码 fail-closed 存储，
 	// REDIS_ENABLED=false 时走进程内存储兜底）
 	usercoreCtrl := ctrlUsercore.New(svcUsercore.New())
-	smsSvc := svcSms.New(cfg.Security.RedisEnabled)
 	userRegCtrl := ctrlUserReg.New(svcUserReg.New(smsSvc, configSvc))
 	smsCtrl := ctrlSms.New(smsSvc)
 
@@ -279,6 +279,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		// 登录验证码域 anon（登录页未登录可调）
 		group.GET("/sys/randomImage/{key}", captchaCtrl.RandomImage)
 		group.POST("/sys/checkCaptcha", captchaCtrl.CheckCaptcha)
+		// 手机登录/加密参数 anon
+		group.POST("/sys/phoneLogin", loginCtrl.PhoneLogin)
+		group.GET("/sys/getEncryptedString", loginCtrl.GetEncryptedString)
 		// 课程域 anon（ShiroConfig.java:158 首页未登录可调）
 		group.GET("/teaching/teachingCourse/getHomeCourse", courseCtrl.GetHomeCourse)
 		// 门户菜单 anon（ShiroConfig.java:145）
@@ -777,6 +780,9 @@ func verifyRouteGuards() {
 	registerGuard("POST", "/api/teaching/user/getUserRootDept", true)
 	registerGuard("PUT", "/api/teaching/user/edit", true)
 	registerGuard("GET", "/api/teaching/user/appUserList", true)
+	registerGuard("PUT", "/api/sys/selectDepart", true)
+	registerGuard("GET", "/api/sys/loginfo", true)
+	registerGuard("GET", "/api/sys/visitInfo", true)
 	registerGuard("PUT", "/api/sys/user/appEdit", true)
 
 	// 课程单元域（P1-2）
