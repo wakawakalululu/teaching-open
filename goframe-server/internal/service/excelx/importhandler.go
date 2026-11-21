@@ -22,8 +22,8 @@ import (
 
 // studentSpec 学生导入列（SysUser @Excel 消费面，Header=中文表头）。
 var studentSpec = Spec{Cols: []ExcelCol{
-	{"username", "登录账号"}, {"realname", "真实姓名"}, {"sex", "性别"},
-	{"phone", "手机号"}, {"email", "邮箱"}, {"password", "密码"},
+	{"username", "登录账号", ""}, {"realname", "真实姓名", ""}, {"sex", "性别", "sex"},
+	{"phone", "手机号", ""}, {"email", "邮箱", ""}, {"password", "密码", ""},
 }}
 
 // ImportStudentResult 导入结果（Java 返回 Result ok(message+result)）。

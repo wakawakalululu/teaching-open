@@ -21,19 +21,6 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// ExcelCol 导出/导入列定义（Field=表列名，Header=中文表头）。
-type ExcelCol struct {
-	Field  string
-	Header string
-}
-
-// Spec 域的 Excel 列规格。
-type Spec struct {
-	Base  string     // 路由基路径
-	Title string     // 导出标题（Java NormalExcelConstants.FILE_NAME）
-	Cols  []ExcelCol // Excel 列（顺序即表头顺序）
-}
-
 // Render 渲染三行头 xlsx（行1 标题、行2 导出人、行3 表头、行4+ 数据）。
 func Render(title, exporter string, headers []string, rows [][]interface{}) ([]byte, error) {
 	f := excelize.NewFile()
