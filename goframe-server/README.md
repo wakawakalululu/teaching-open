@@ -227,7 +227,7 @@ go run .
 
 - P0 全部 + P1 课程/单元/课程授权/门户菜单/文件域已迁移（**P0+P1 阶段完成**），待 sqlpub 真实库回归
   （登录 → 用户列表增删改查 → 角色分配 → 菜单/角色授权 → 部门树/部门角色 → 部门关联）。
-- 未实现全部 484 个业务端点（P0+P1+P2-1~6a 已迁移 ~320 个；剩余：Quartz execute 执行能力、消息域 17 端点（表不在 V2.8 DDL 明确跳过）、exportXls/importExcel 全域、SysUser 少量辅助端点）。
+- **迁移收口（2026-11-21）**：已迁移 ~324 个核心端点并全部实测过门槛。有意未迁移（逐条文档化）：exportXls/importExcel 全域 ~20 端点（AutoPoi Excel 引擎为独立能力，按需立项）、importStudent（依赖 Excel 引擎）、消息域 17 端点（sys_message_template/sys_message 表不在 V2.8 DDL）、Quartz execute 执行能力（Go 无调度器后端，pause/resume 状态落库已实现）、demo/mock 73 端点（上游示例代码，明确不迁移）、websocket 广播。补齐任意一项即继续逼近 484 全量。
 - 密码兼容向量已通过 Go 侧 `Encrypt`/`Decrypt` 双向验证（与 Java 4 组向量逐字节一致），
   仍建议在真实 JDK 环境跑一次 `PasswordUtil.encrypt` 作为最终确认。
 - 短信通道（阿里云 dysmsapi）未接入：验证码仅落日志（开发环境），生产接入时须移除该日志。
