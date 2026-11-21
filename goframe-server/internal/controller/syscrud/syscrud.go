@@ -169,3 +169,17 @@ func (d *Domain) ListAllOptionsEngine(ctx context.Context, name string) ([]map[s
 	}
 	return out, nil
 }
+
+// QueryByUserName 按 user_name 精确查询（SysUserAgentController#queryByUserName）。
+func (d *Domain) QueryByUserName(r *ghttp.Request) {
+	res, err := d.svc.QueryByUserName(r.Context(), r.Get("userName").String())
+	if err != nil {
+		common.Fail(r, "操作失败")
+		return
+	}
+	if res == nil {
+		common.Fail(r, d.notFound)
+		return
+	}
+	common.OK(r, res)
+}

@@ -614,6 +614,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		// P2-6 泛型域与特殊端点（在闭包内以 group/guard 装配）
 		wireP2_6Domains(group, registerGuard, svcSSPkg.New())
 
+		// P2-8 收尾域：SysUserAgent（syscrud）+ ng-alain（Angular 辅助）
+		wireUserAgentAndNgAlain(group, registerGuard)
+
 		// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
 		for _, exBase := range excelxBases {
 			group.GET(exBase+"/exportXls", excelxCtrl.ExportXls(exBase))

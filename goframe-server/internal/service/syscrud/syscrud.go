@@ -245,3 +245,17 @@ func RowsAffected(result interface{}) int64 {
 	}
 	return 1
 }
+
+// QueryByUserName 按 user_name 精确查询（SysUserAgent 专用；通用引擎以
+// id 为主键，此方法供按业务键查询的端点复用）。
+func (e *Engine) QueryByUserName(ctx context.Context, userName string) (map[string]interface{}, error) {
+	rec, err := g.DB().Model(e.def.Table).
+		Where("user_name", userName).Limit(1).One()
+	if err != nil {
+		return nil, fmt.Errorf("查询详情失败: %w", err)
+	}
+	if rec.IsEmpty() {
+		return nil, nil
+	}
+	return rec.Map(), nil
+}
