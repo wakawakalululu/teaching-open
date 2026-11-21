@@ -23,7 +23,17 @@ type Config struct {
 	Security  SecurityConfig
 	Storage   StorageConfig
 	Site      SiteConfig
+	Qiniu     QiniuConfig
 	Logistics LogisticsConfig
+}
+
+// QiniuConfig 七牛凭证（getToken 上传令牌生成用；未配置 AK 时令牌为空串
+// AccessKey，与 Java 空配置行为一致）。
+type QiniuConfig struct {
+	AccessKey string
+	SecretKey string
+	Bucket    string
+	Area      string
 }
 
 // JWTConfig 令牌参数。
@@ -139,6 +149,11 @@ func Load() (*Config, error) {
 	cfg.Site.OwID = env("OW365_ID", "")
 	cfg.Site.OwKey = env("OW365_KEY", "??")
 	cfg.Site.OwIv = env("OW365_IV", "")
+
+	cfg.Qiniu.AccessKey = env("QINIU_AK", "")
+	cfg.Qiniu.SecretKey = env("QINIU_SK", "")
+	cfg.Qiniu.Bucket = env("QINIU_BUCKET", "")
+	cfg.Qiniu.Area = env("QINIU_AREA", "z0")
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err

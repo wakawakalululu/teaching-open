@@ -23,10 +23,13 @@ import (
 	ctrlDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/dict"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
+	ctrlQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/qiniu"
 	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
 	ctrlSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sms"
+	ctrlSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/sysfile"
 	ctrlTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachingmenu"
 	ctrlTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/teachinguser"
+	ctrlUpload "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/upload"
 	ctrlUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/useraux"
 	ctrlUsercore "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/usercore"
 	ctrlUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/userdepart"
@@ -47,6 +50,7 @@ import (
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
 	svcSms "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sms"
+	svcSysFile "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/sysfile"
 	svcTeachingMenu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachingmenu"
 	svcTeachingUser "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/teachinguser"
 	svcUseraux "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/useraux"
@@ -54,6 +58,8 @@ import (
 	svcUserDepart "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userdepart"
 	svcUserReg "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userreg"
 	svcUserRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/userrole"
+	// svcQiniu 以值配置注入控制器（无状态服务）
+	svcQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/qiniu"
 )
 
 var (
@@ -153,6 +159,14 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 	courseDeptCtrl := ctrlCourseDept.New(svcCourseDept.New())
 	teachingMenuCtrl := ctrlTeachingMenu.New(svcTeachingMenu.New())
 	teachingUserCtrl := ctrlTeachingUser.New(svcTeachingUser.New())
+	// P1-4 业务域：文件记录 / 七牛令牌 / 本地上传与静态预览
+	sysFileCtrl := ctrlSysFile.New(svcSysFile.New(cfg.Storage.LocalRoot))
+	qiniuCtrl := ctrlQiniu.New(svcQiniu.Config{
+		AccessKey: cfg.Qiniu.AccessKey,
+		SecretKey: cfg.Qiniu.SecretKey,
+		Bucket:    cfg.Qiniu.Bucket,
+	})
+	uploadCtrl := ctrlUpload.New(cfg.Site.UploadType, cfg.Storage.LocalRoot)
 	// P0-3 业务域：用户角色分配 / 用户-部门关联 / 用户辅助（查询/回收站）
 	userRoleCtrl := ctrlUserRole.New(svcUserRole.New())
 	userDepartCtrl := ctrlUserDepart.New(svcUserDepart.New())
@@ -225,6 +239,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.GET("/teaching/teachingCourse/getHomeCourse", courseCtrl.GetHomeCourse)
 		// 门户菜单 anon（ShiroConfig.java:145）
 		group.GET("/teaching/menu/getUserMenu", teachingMenuCtrl.GetUserMenu)
+		// 本地静态预览 anon（ShiroConfig.java:88 图片预览与下载不限 token）
+		group.GET("/sys/common/static/*path", uploadCtrl.Static)
 	})
 
 	// 受保护路由
@@ -408,6 +424,24 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.DELETE("/teaching/menu/deleteBatch", teachingMenuCtrl.DeleteBatch)
 		group.GET("/teaching/menu/queryTreeList", teachingMenuCtrl.QueryTreeList)
 		group.GET("/teaching/menu/queryListAsync", teachingMenuCtrl.QueryListAsync)
+
+		// 文件记录域（P1-4，基路径 /system/sysFile 对齐 Java）
+		group.GET("/system/sysFile/list", sysFileCtrl.List)
+		group.POST("/system/sysFile/add", sysFileCtrl.Add)
+		group.PUT("/system/sysFile/edit", sysFileCtrl.Edit)
+		group.DELETE("/system/sysFile/delete", sysFileCtrl.Delete)
+		group.DELETE("/system/sysFile/deleteByPath", sysFileCtrl.DeleteByPath)
+		group.DELETE("/system/sysFile/deleteBatch", sysFileCtrl.DeleteBatch)
+		group.GET("/system/sysFile/queryById", sysFileCtrl.QueryById)
+
+		// 七牛令牌域（P1-4；@RequestMapping 无 method → GET/POST 双登记）
+		group.GET("/common/qiniu/getToken", qiniuCtrl.GetToken)
+		group.POST("/common/qiniu/getToken", qiniuCtrl.GetToken)
+		group.GET("/common/qiniu/getTokenByKey", qiniuCtrl.GetTokenByKey)
+		group.POST("/common/qiniu/getTokenByKey", qiniuCtrl.GetTokenByKey)
+
+		// 本地上传（P1-4）
+		group.POST("/sys/common/upload", uploadCtrl.Upload)
 
 		// 用户角色分配域（P0-3）
 		group.GET("/sys/user/queryUserRole", userRoleCtrl.QueryUserRole)
@@ -618,6 +652,26 @@ func verifyRouteGuards() {
 	registerGuard("GET", "/api/teaching/menu/queryTreeList", true)
 	registerGuard("GET", "/api/teaching/menu/queryListAsync", true)
 	registerGuard("GET", "/api/teaching/menu/getUserMenu", false)
+
+	// 文件记录域（P1-4）
+	registerGuard("GET", "/api/system/sysFile/list", true)
+	registerGuard("POST", "/api/system/sysFile/add", true)
+	registerGuard("PUT", "/api/system/sysFile/edit", true)
+	registerGuard("DELETE", "/api/system/sysFile/delete", true)
+	registerGuard("DELETE", "/api/system/sysFile/deleteByPath", true)
+	registerGuard("DELETE", "/api/system/sysFile/deleteBatch", true)
+	registerGuard("GET", "/api/system/sysFile/queryById", true)
+
+	// 七牛令牌域（P1-4，需登录）
+	registerGuard("GET", "/api/common/qiniu/getToken", true)
+	registerGuard("POST", "/api/common/qiniu/getToken", true)
+	registerGuard("GET", "/api/common/qiniu/getTokenByKey", true)
+	registerGuard("POST", "/api/common/qiniu/getTokenByKey", true)
+
+	// 本地上传（P1-4）
+	registerGuard("POST", "/api/sys/common/upload", true)
+	// 本地静态预览为 anon（ShiroConfig.java:88），非写操作不强制登记
+	registerGuard("GET", "/api/sys/common/static/*path", false)
 	// 用户辅助域公开读接口（Shiro anon 依据 ShiroConfig.java L82/L84）
 	registerGuard("GET", "/api/sys/user/checkOnlyUser", false)
 	registerGuard("GET", "/api/sys/user/querySysUser", false)
