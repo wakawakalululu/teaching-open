@@ -99,6 +99,29 @@ func TestNormalizeOrder(t *testing.T) {
 	}
 }
 
+func TestParseQueryRule(t *testing.T) {
+	cases := []struct {
+		raw      string
+		wantKind string
+		wantVal  string
+		wantVals []string
+	}{
+		{"admin", "eq", "admin", nil},
+		{"*管理员*", "like", "%管理员%", nil},
+		{"user*", "like", "user%", nil},
+		{"*员", "like", "%员", nil},
+		{"a,b,c", "in", "", []string{"a", "b", "c"}},
+		{"!=admin", "ne", "admin", nil},
+	}
+	for _, tc := range cases {
+		kind, val, vals := parseQueryRule(tc.raw)
+		if kind != tc.wantKind || val != tc.wantVal || len(vals) != len(tc.wantVals) {
+			t.Errorf("parseQueryRule(%q) = (%q,%q,%v), 期望 (%q,%q,%v)",
+				tc.raw, kind, val, vals, tc.wantKind, tc.wantVal, tc.wantVals)
+		}
+	}
+}
+
 func TestNormalizeDrChecked(t *testing.T) {
 	cases := []struct {
 		raw      string

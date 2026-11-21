@@ -125,7 +125,9 @@ func New() *Service {
 //
 // 契约蓝本 SysRoleController#list（GET /sys/role/list）：
 //   - QueryGenerator 动态条件 → Go 收敛为前端实际消费面（RoleList.vue：
-//     roleName 模糊 + createTime_begin/end 区间；RoleUserList.vue 仅分页）；
+//     roleName 过滤 + createTime_begin/end 区间；RoleUserList.vue 仅分页）。
+//     字符串字段走 parseQueryRule 语义（无前缀 EQ、* 通配 → LIKE，对齐
+//     QueryGenerator.java L163-168 的注释掉的全模糊分支与 getByValue 规则）；
 //   - Java 无默认排序（无 ORDER BY），Go 保持一致，仅当 column/order 传入且
 //     过白名单时排序；
 //   - result：IPage {records,total,size,current,pages}，records 为 SysRole 全字段。
@@ -133,13 +135,13 @@ func (s *Service) List(ctx context.Context, param page.Param, f ListFilter) (*pa
 	cols := dao.SysRole.Columns()
 	m := dao.SysRole.Ctx(ctx)
 	if f.RoleName != "" {
-		m = m.WhereLike(cols.RoleName, "%"+f.RoleName+"%")
+		m = applyQueryRule(m, cols.RoleName, f.RoleName)
 	}
 	if f.RoleCode != "" {
-		m = m.WhereLike(cols.RoleCode, "%"+f.RoleCode+"%")
+		m = applyQueryRule(m, cols.RoleCode, f.RoleCode)
 	}
 	if f.Description != "" {
-		m = m.WhereLike(cols.Description, "%"+f.Description+"%")
+		m = applyQueryRule(m, cols.Description, f.Description)
 	}
 	if f.RoleLevel != nil {
 		m = m.Where(cols.RoleLevel, *f.RoleLevel)
@@ -633,4 +635,36 @@ func camelToUnderline(s string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+// applyQueryRule 按 QueryGenerator 值规则应用过滤条件（QueryRuleEnum#getByValue）。
+func applyQueryRule(m *gdb.Model, column, raw string) *gdb.Model {
+	kind, val, vals := parseQueryRule(raw)
+	switch kind {
+	case "ne":
+		return m.WhereNot(column, val)
+	case "like":
+		return m.WhereLike(column, val)
+	case "in":
+		return m.WhereIn(column, vals)
+	default:
+		return m.Where(column, val)
+	}
+}
+
+// parseQueryRule QueryGenerator 值规则纯判定（便于单测，QueryRuleEnum#getByValue）：
+// 值含 * → 全模糊 LIKE（* 替换为 %）；值含 , → IN；前缀 != → NE；
+// 其余 EQ（QueryGenerator.java L163-168 注释掉了「字符串默认全模糊」，
+// V2.8 生效语义即无前缀 EQ）。
+func parseQueryRule(raw string) (kind, val string, vals []string) {
+	switch {
+	case strings.HasPrefix(raw, "!="):
+		return "ne", strings.TrimPrefix(raw, "!="), nil
+	case strings.Contains(raw, "*"):
+		return "like", strings.ReplaceAll(raw, "*", "%"), nil
+	case strings.Contains(raw, ","):
+		return "in", "", strings.Split(raw, ",")
+	default:
+		return "eq", raw, nil
+	}
 }
