@@ -34,7 +34,12 @@ const (
 )
 
 func main() {
-	genv.Set("MYSQL_LINK", "mysql:teaching:Teaching2026!@tcp(127.0.0.1:3306)/teachingopen?parseTime=true&loc=Local")
+	// 端口约定：MariaDB 13306（高端口防冲突）；可经环境变量 MYSQL_LINK 覆盖。
+	link := os.Getenv("MYSQL_LINK")
+	if link == "" {
+		link = "mysql:teaching:Teaching2026!@tcp(127.0.0.1:13306)/teachingopen?parseTime=true&loc=Local"
+	}
+	genv.Set("MYSQL_LINK", link)
 	gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			gdb.ConfigNode{Link: genv.Get("MYSQL_LINK").String(), Type: "mysql"},

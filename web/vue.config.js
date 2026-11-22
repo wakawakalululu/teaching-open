@@ -68,10 +68,11 @@ module.exports = {
   },
 
   devServer: {
-    port: 80,
+    // 端口约定：前端 dev 18082，代理到 Go 后端 18080（统一高端口防冲突）。
+    port: 18082,
     proxy: {
       '/api': {
-        target: 'http://localhost:8081', 
+        target: 'http://localhost:18080', 
         ws: true,
         changeOrigin: true
       },

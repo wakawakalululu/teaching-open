@@ -228,7 +228,7 @@ server
     location ^~ /api
     {
         expires 0;
-        proxy_pass              http://127.0.0.1:8080/api/;
+        proxy_pass              http://127.0.0.1:18080/api/;
         proxy_set_header        Host 127.0.0.1;
         proxy_set_header        X-Real-IP $remote_addr;
         proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -246,7 +246,7 @@ server
 
 有两种可能：
 
-1. api未启动，尝试访问http://ip地址:8080看是否有内容输出
+1. api未启动，尝试访问http://ip地址:18080看是否有内容输出
 2. nginx反向代理配置错误，特征是接口报502或504错误
 
 ### 后台上传的Scratch素材库不显示

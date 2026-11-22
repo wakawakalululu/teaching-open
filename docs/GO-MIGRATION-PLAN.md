@@ -513,6 +513,7 @@ $ go test ./... -count=1    → 5 个包全部 ok，44 项测试通过
 | Go 工具链 | go1.27.4（go.mod 指令 1.26.0） | Linux 便携安装 ~/tools/go |
 | Web 框架 | GoFrame v2.10.4 | 约定见 .agents/skills/goframe-v2 |
 | 数据库 | MariaDB 11.8.9（teachingopen） | 69 表 V2.8 DDL + 春晖种子 |
+| 端口约定 | API 18080 / 前端 dev 18082 / 静态预览 18083 / DB 13306 | 统一高端口防冲突（2026-11-22 起） |
 | Excel 引擎 | excelize v2.8.1 | 15 域规格 + importStudent |
 | 前端 | vue-antd-jeecg 2.2.0（Vue 2.7.16） | Node 20.19.4 生产构建通过 |
 | 注册路由 | ~325 条（internal/cmd/） | Java 484 方法级基线见 §7 |

@@ -31,7 +31,7 @@ import (
 const (
 	testUsername = "e2e_test_user"
 	testPassword = "LegacyP@ss123"
-	baseURL      = "http://127.0.0.1:8080"
+	baseURL      = "http://127.0.0.1:18080"
 )
 
 func main() {

@@ -2,8 +2,10 @@
 # 密钥（JWT）必须通过环境变量 JWT_SECRET 注入，不落本文件。
 
 # HTTP Server
+# 端口约定：统一使用高端口避免与其他应用冲突——API 18080、前端 dev 18082、
+# 本地静态预览 18083、MySQL/MariaDB 13306。
 server:
-  address: ":8080"
+  address: ":18080"
   dumpRouterMap: false
   routeOverWrite: true
   accessLogEnabled: true
@@ -22,7 +24,7 @@ database:
     level: "all"
     stdout: true
   default:
-    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/teachingopen?parseTime=true&loc=UTC"
+    link: "mysql:root:12345678@tcp(127.0.0.1:13306)/teachingopen?parseTime=true&loc=UTC"
     debug: false
 
 # Redis（可选，未配置时登录限流/令牌吊销自动降级为 fail-open）
