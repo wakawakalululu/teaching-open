@@ -629,3 +629,52 @@ func (s *Service) LoadTreeData(ctx context.Context, pid, pidField, table, text, 
 func jsonUnmarshalHelper(data string, v interface{}) error {
 	return gjson.Unmarshal([]byte(data), v)
 }
+
+// QueryTableData 表字典分页查询（契约蓝本 SysDictController#queryTableData）。
+// 表/文本列/值列经白名单校验；支持 QueryGenerator 风格过滤条件（condition JSON）。
+func (s *Service) QueryTableData(ctx context.Context, table, text, code, condition string, param page.Param) (*page.Result, error) {
+	for _, ident := range []string{table, text, code} {
+		if !ValidIdent(ident) {
+			return nil, ErrDictCodeInvalid
+		}
+	}
+	where := ""
+	args := make([]interface{}, 0, 4)
+	if condition != "" {
+		cond := map[string]string{}
+		if err := jsonUnmarshalHelper(condition, &cond); err != nil {
+			return nil, ErrTableDictFilterUnsupported
+		}
+		clauses := make([]string, 0, len(cond))
+		for k, v := range cond {
+			if !ValidIdent(k) {
+				return nil, ErrDictCodeInvalid
+			}
+			clauses = append(clauses, k+" = ?")
+			args = append(args, v)
+		}
+		if len(clauses) > 0 {
+			where = " WHERE " + strings.Join(clauses, " AND ")
+		}
+	}
+	base := fmt.Sprintf("SELECT %s AS `text`, %s AS `value` FROM %s", text, code, table) + where
+	totalRec, err := dao.SysDict.DB().GetOne(ctx, "SELECT COUNT(*) AS c FROM ("+base+") t", args...)
+	if err != nil {
+		return nil, fmt.Errorf("统计表字典失败: %w", err)
+	}
+	total := totalRec["c"].Int()
+	if total == 0 {
+		return page.New([]DictModel{}, 0, param.PageNo, param.PageSize), nil
+	}
+	offset := (param.PageNo - 1) * param.PageSize
+	pageArgs := append(append([]interface{}{}, args...), param.PageSize, offset)
+	records, err := dao.SysDict.DB().GetAll(ctx, base+" LIMIT ? OFFSET ?", pageArgs...)
+	if err != nil {
+		return nil, fmt.Errorf("查询表字典失败: %w", err)
+	}
+	list := make([]DictModel, 0, len(records))
+	for _, rec := range records {
+		list = append(list, DictModel{Text: rec["text"].String(), Value: rec["value"].String()})
+	}
+	return page.New(list, total, param.PageNo, param.PageSize), nil
+}

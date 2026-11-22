@@ -41,6 +41,9 @@ func wireContractGaps(group *ghttp.RouterGroup, guard func(method, path string, 
 	group.GET("/sys/loginfo", loginCtrl.LogInfo)
 	guard("GET", "/api/sys/loginfo", true)
 
+	group.GET("/sys/visitInfo", loginCtrl.VisitInfo)
+	guard("GET", "/api/sys/visitInfo", true)
+
 	// ---- 字典通用表树（SysDictController#loadTreeData）----
 	group.GET("/sys/dict/loadTreeData", dictCtrl.LoadTreeData)
 	guard("GET", "/api/sys/dict/loadTreeData", true)
@@ -93,6 +96,10 @@ func wireContractGaps(group *ghttp.RouterGroup, guard func(method, path string, 
 	guard("PUT", "/api/sys/fillRule/executeRuleByCodeBatch", true)
 
 	// ---- 文件下载与 PDF 预览（CommonController）----
+	// MinIO 上传：本部署 UPLOAD_TYPE=local，复用本地上传实现（语义等价）。
+	group.POST("/sys/upload/uploadMinio", uploadCtrl.Upload)
+	guard("POST", "/api/sys/upload/uploadMinio", true)
+
 	// 下载复用本地静态服务（同一存储根 + 路径穿越剥离），仅语义名为 download。
 	group.GET("/sys/common/download/*path", uploadCtrl.Static)
 	guard("GET", "/api/sys/common/download/*path", true)

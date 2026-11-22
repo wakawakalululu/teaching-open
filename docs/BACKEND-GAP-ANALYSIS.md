@@ -150,3 +150,32 @@ grep -rhoE '(getAction|postAction|putAction|deleteAction)\("[^"]+' web/src | sor
 # 3) 管理页逐页实测
 node build/probe_admin.js   # 输出 /tmp/admin_probe.json
 ```
+
+---
+
+## 6. 第二轮推进结果（2026-11-22，按 §4 计划执行）
+
+### 6.1 已完成项
+
+| 计划项 | 交付 | 验证 |
+| --- | --- | --- |
+| P0-1 残留端点 | `/sys/dict/queryTableData`、`/sys/common/403`、`/sys/common/transitRESTful`（SSRF 防护：显式拒绝）、`/sys/upload/uploadMinio`（本地等价实现）、`/sys/visitInfo` | 全部 200 / 明确业务错误 |
+| P0-2 OSS 域 | `oss_file` dao/do/entity + `service/oss` + `controller/oss`，4 端点（本地存储后端，MinIO 接入点隔离在 service 层） | `/oss/file/list` 200 |
+| P1-1 路由一致性测试 | `internal/cmd/routes_test.go`：源码解析守卫与注册，动态域（excelxBases/p2_6）展开后比对 | **守卫 310 条 / 注册 472 条全部对应**；首跑即发现 `/sys/visitInfo` 漂移并修复 |
+| P1-2 Excel 规格一致性测试 | `internal/service/excelx/registry_test.go`：Spec 列 vs DDL 列双向断言；`TableByBase` 收敛为唯一映射源 | **27 个 Excel 域全部一致**；首跑发现 CourseDept/CourseUnit 缺 Spec（导出报「未配置」）并补齐 |
+| P1-3 契约覆盖测试 | `internal/cmd/contract_test.go`：解析 Java 注解（跳过注释方法），排除清单显式化，阈值 85% | **372/372 = 100%**（404 条 Java 端点中 demo/test/Spring/OAuth/CAS 共 32 条按白名单排除） |
+| P3 工作台真实化 | 7 端点：teams/activity/radar/role/user/projects/task-process + service 健康；响应形状按 Workplace.vue 逐字段对齐（`result.data`、`user.nickname`、`个人/团队/部门`） | 工作台截图全量真实数据，**API 失败数 0** |
+
+### 6.2 关键结论
+
+- 端到端契约覆盖率由 **89.5% → 100%**（排除项均有文档化理由）。
+- 新增 3 个回归测试把「一次性对账」变成持续门禁，其中两个测试**首次运行即各发现 1 个真实缺陷**。
+- 工作台从「骨架屏 + 5 个 404」变为真实数据（6 门课程项目卡、8 条动态、3 个班级团队、雷达图有值）。
+
+### 6.3 下一步（P1 剩余 + P2）
+
+1. **路由单一注册表**（P1 架构项）：现状仍是「路由 + 守卫」两处手写，虽已有测试兜底，
+   仍建议收敛为 `Route{Method,Path,Handler,Auth}` 结构体注册，测试改为运行时断言。
+2. **种子分层**（P2）：`base`（系统表）/`demo`（业务示例）拆分，避免再次清空系统表。
+3. **空表探针**（P2）：启动时对管理页依赖表做行数检查并打 WARN。
+4. **未启用模块菜单置灰**（P3）：在线表单/工作流/CAS 在菜单层标注，避免 404 错觉。

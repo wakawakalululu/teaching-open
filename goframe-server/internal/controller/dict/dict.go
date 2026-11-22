@@ -11,6 +11,7 @@ import (
 
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/common"
 	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/do"
+	"github.com/wakawakalululu/teaching-open/goframe-server/internal/model/page"
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 )
 
@@ -133,6 +134,21 @@ func (c *Controller) List(r *ghttp.Request) {
 // TreeList 树形字典列表。
 func (c *Controller) TreeList(r *ghttp.Request) {
 	res, err := c.svc.TreeList(r.Context(), r.Get("dictName").String())
+	if err != nil {
+		c.writeError(r, err)
+		return
+	}
+	ok(r, res)
+}
+
+// QueryTableData 表字典分页查询（契约：GET /sys/dict/queryTableData）。
+func (c *Controller) QueryTableData(r *ghttp.Request) {
+	res, err := c.svc.QueryTableData(r.Context(),
+		r.Get("table").String(), r.Get("text").String(), r.Get("code").String(),
+		r.Get("condition").String(), page.Param{
+			PageNo:   r.Get("pageNo", 1).Int(),
+			PageSize: r.Get("pageSize", 10).Int(),
+		})
 	if err != nil {
 		c.writeError(r, err)
 		return

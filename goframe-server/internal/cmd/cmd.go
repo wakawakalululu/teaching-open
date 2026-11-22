@@ -27,6 +27,7 @@ import (
 	ctrlExcelx "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/excelx"
 	ctrlLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/login"
 	ctrlMessage "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/message"
+	ctrlOSS "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/oss"
 	ctrlPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/permission"
 	ctrlQiniu "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/qiniu"
 	ctrlRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/controller/role"
@@ -61,6 +62,7 @@ import (
 	svcDict "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/dict"
 	svcLogin "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/login"
 	svcMessage "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/message"
+	svcOSS "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/oss"
 	svcPermission "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/permission"
 	svcRole "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/role"
 	svcScratch "github.com/wakawakalululu/teaching-open/goframe-server/internal/service/scratch"
@@ -194,6 +196,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		Bucket:    cfg.Qiniu.Bucket,
 	})
 	uploadCtrl := ctrlUpload.New(cfg.Site.UploadType, cfg.Storage.LocalRoot)
+	// P0 收尾：OSS 文件域（本地存储后端）
+	ossCtrl := ctrlOSS.New(svcOSS.New(cfg.Storage.LocalRoot, cfg.Site.StaticDomain))
 	// P2 业务域：作业（标签/点赞/班级日志计数走 KV 存储，键格式兼容灰度双写）
 	teachingWorkCtrl := ctrlTeachingWork.New(svcTeachingWork.New(cfg.Security.RedisEnabled,
 		cfg.Site.StaticDomain, cfg.Site.QiniuDomain, cfg.Site.UploadType))
@@ -639,6 +643,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 
 		// 契约补齐：方法别名 + 遗漏端点（Java 411 方法级对账后逐条对齐）
 		wireContractGaps(group, registerGuard, dictCtrl, loginCtrl, teachingUserCtrl, uploadCtrl)
+
+		// P0 收尾：字典表分页/403/transitRESTful/OSS/工作台真实数据
+		wireP0Gaps(group, registerGuard, dictCtrl, ossCtrl)
 
 		// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
 		for _, exBase := range excelxBases {

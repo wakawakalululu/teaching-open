@@ -138,39 +138,9 @@ func (c *Controller) ImportStudent(r *ghttp.Request) {
 	common.OKMsg(r, msg, res.Errors)
 }
 
-// specTable/specDelFlag 表名与 del_flag 列映射（与 Spec 注册表 Base 对应）。
+// specTable 表名映射（唯一实现在 service/excelx.TableByBase）。
 func specTable(base string) string {
-	m := map[string]string{
-		"/sys/fillRule":                   "sys_fill_rule",
-		"/sys/checkRule":                  "sys_check_rule",
-		"/sys/dataSource":                 "sys_data_source",
-		"/sys/position":                   "sys_position",
-		"/sys/log":                        "sys_log",
-		"/sys/dataLog":                    "sys_data_log",
-		"/sys/quartzJob":                  "sys_quartz_job",
-		"/sys/annountCement":              "sys_announcement",
-		"/sys/user":                       "sys_user",
-		"/teaching/teachingNews":          "teaching_news",
-		"/teaching/teachingCourse":        "teaching_course",
-		"/teaching/teachingCourseUnit":    "teaching_course_unit",
-		"/teaching/teachingCourseDept":    "teaching_course_dept",
-		"/teaching/teachingWork":          "teaching_work",
-		"/teaching/teachingScratchAssets": "teaching_scratch_assets",
-		// 2026-11-22 Excel 补全域
-		"/sys/dict":                      "sys_dict",
-		"/sys/dictItem":                  "sys_dict_item",
-		"/sys/category":                  "sys_category",
-		"/sys/role":                      "sys_role",
-		"/sys/sysDepart":                 "sys_depart",
-		"/sys/sysDepartPermission":       "sys_depart_permission",
-		"/sys/sysDepartRole":             "sys_depart_role",
-		"/system/sysFile":                "sys_file",
-		"/sys/sysUserAgent":              "sys_user_agent",
-		"/message/sysMessage":            "sys_sms",
-		"/message/sysMessageTemplate":    "sys_sms_template",
-		"/teaching/teachingDepartDayLog": "teaching_depart_day_log",
-	}
-	return m[base]
+	return svcEX.TableByBase(base)
 }
 
 // delFlagCol 含 del_flag 列的表返回列名（导出过滤已删行），否则空。

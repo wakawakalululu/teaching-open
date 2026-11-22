@@ -189,4 +189,73 @@ var specs = []Spec{
 		{Field: "course_work_submit_count", Header: "课程作业提交数"},
 		{Field: "create_time", Header: "统计日期"},
 	}},
+	{Base: "/teaching/teachingCourseDept", Title: "课程授权列表", Cols: []ExcelCol{
+		{Field: "dept_id", Header: "授权部门"},
+		{Field: "course_id", Header: "课程"},
+		{Field: "open_time", Header: "开放时间"},
+		{Field: "create_by", Header: "创建人"},
+		{Field: "create_time", Header: "创建日期"},
+	}},
+	{Base: "/teaching/teachingCourseUnit", Title: "课程单元列表", Cols: []ExcelCol{
+		{Field: "unit_name", Header: "单元名称"},
+		{Field: "unit_intro", Header: "单元简介"},
+		{Field: "unit_cover", Header: "单元封面"},
+		{Field: "course_id", Header: "所属课程"},
+		{Field: "course_video", Header: "课程视频"},
+		{Field: "course_case", Header: "课程案例"},
+		{Field: "course_ppt", Header: "课程PPT"},
+		{Field: "course_work", Header: "课程作业"},
+		{Field: "course_plan", Header: "课程教案"},
+		{Field: "map_x", Header: "地图X坐标"},
+		{Field: "map_y", Header: "地图Y坐标"},
+		{Field: "order_num", Header: "排序"},
+		{Field: "create_by", Header: "创建人"},
+		{Field: "create_time", Header: "创建日期"},
+	}},
+}
+
+// baseTables 域基路径 → 物理表名（Excel 导出/导入的唯一映射源，
+// 供 controller 与一致性测试共用）。
+var baseTables = map[string]string{
+	"/sys/fillRule":                   "sys_fill_rule",
+	"/sys/checkRule":                  "sys_check_rule",
+	"/sys/dataSource":                 "sys_data_source",
+	"/sys/position":                   "sys_position",
+	"/sys/log":                        "sys_log",
+	"/sys/dataLog":                    "sys_data_log",
+	"/sys/quartzJob":                  "sys_quartz_job",
+	"/sys/annountCement":              "sys_announcement",
+	"/sys/user":                       "sys_user",
+	"/teaching/teachingNews":          "teaching_news",
+	"/teaching/teachingCourse":        "teaching_course",
+	"/teaching/teachingCourseUnit":    "teaching_course_unit",
+	"/teaching/teachingCourseDept":    "teaching_course_dept",
+	"/teaching/teachingWork":          "teaching_work",
+	"/teaching/teachingScratchAssets": "teaching_scratch_assets",
+	"/sys/dict":                       "sys_dict",
+	"/sys/dictItem":                   "sys_dict_item",
+	"/sys/category":                   "sys_category",
+	"/sys/role":                       "sys_role",
+	"/sys/sysDepart":                  "sys_depart",
+	"/sys/sysDepartPermission":        "sys_depart_permission",
+	"/sys/sysDepartRole":              "sys_depart_role",
+	"/system/sysFile":                 "sys_file",
+	"/sys/sysUserAgent":               "sys_user_agent",
+	"/message/sysMessage":             "sys_sms",
+	"/message/sysMessageTemplate":     "sys_sms_template",
+	"/teaching/teachingDepartDayLog":  "teaching_depart_day_log",
+}
+
+// TableByBase 返回域对应的物理表名（不存在返回空串）。
+func TableByBase(base string) string {
+	return baseTables[base]
+}
+
+// SpecTables 返回全部已注册域的 base→table 映射（只读副本，测试用）。
+func SpecTables() map[string]string {
+	out := make(map[string]string, len(baseTables))
+	for k, v := range baseTables {
+		out[k] = v
+	}
+	return out
 }
