@@ -54,6 +54,7 @@ func main() {
 
 	seedDeparts()
 	seedRoles()
+	seedRolePermissions()
 	seedUsers()
 	seedUserRoles()
 	seedUserDeparts()
@@ -107,6 +108,37 @@ func seedRoles() {
 		g.DB().Model("sys_role").Data(r).Save()
 	}
 	fmt.Println("角色 4 条已插入")
+}
+
+// seedRolePermissions 管理员角色绑定全部菜单权限。
+// 对齐 Java 演示数据模式：sys_role_permission 是角色→菜单授权唯一来源，
+// QueryByUser 严格按该表连接过滤（无 admin 旁路），不绑定则动态管理菜单为空。
+func seedRolePermissions() {
+	if _, err := g.DB().Model("sys_role_permission").Where("role_id", "ch_role_admin").Delete(); err != nil {
+		fmt.Printf("清除旧管理员授权失败: %v\n", err)
+	}
+	perms, err := g.DB().Model("sys_permission").Fields("id").All()
+	if err != nil {
+		fmt.Printf("读取菜单权限失败: %v\n", err)
+		return
+	}
+	n := 0
+	for i, row := range perms {
+		pid := row["id"].String()
+		if pid == "" {
+			continue
+		}
+		if _, err := g.DB().Model("sys_role_permission").Data(map[string]interface{}{
+			"id":            fmt.Sprintf("ch_rp_%04d", i),
+			"role_id":       "ch_role_admin",
+			"permission_id": pid,
+		}).Save(); err != nil {
+			fmt.Printf("插入授权 %s 失败: %v\n", pid, err)
+			continue
+		}
+		n++
+	}
+	fmt.Printf("管理员授权 %d 条已插入\n", n)
 }
 
 // seedUsers 用户：1 管理员 + 3 教师 + 6 学生。

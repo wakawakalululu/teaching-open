@@ -106,6 +106,12 @@ var publicPaths = map[string]struct{}{
 	"/api/sys/user/passwordChange":               {},
 	"/api/teaching/teachingCourse/getHomeCourse": {},
 	"/api/teaching/menu/getUserMenu":             {},
+	"/api/sys/phoneLogin":                        {},
+	"/api/sys/randomImage/{key}":                 {},
+	"/api/sys/checkCaptcha":                      {},
+	"/api/sys/getEncryptedString":                {},
+	"/api/websocket/{userId}":                    {},
+	"/api/sys/ng-alain/getDictItems/{dictCode}":  {},
 }
 
 // routeGuard 路由守卫登记项。
@@ -284,20 +290,28 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/user/register", userRegCtrl.Register)
 		group.POST("/user/phoneVerification", userRegCtrl.PhoneVerification)
 		group.GET("/user/passwordChange", userRegCtrl.PasswordChange)
-		// 登录验证码域 anon（登录页未登录可调）
-		group.GET("/sys/randomImage/{key}", captchaCtrl.RandomImage)
-		group.POST("/sys/checkCaptcha", captchaCtrl.CheckCaptcha)
+		// 登录验证码域 anon（登录页未登录可调）——注意组前缀已是 /api/sys，
+		// 路由串不得再带 /sys（Java 契约 /sys/randomImage → /api/sys/randomImage）
+		group.GET("/randomImage/{key}", captchaCtrl.RandomImage)
+		group.POST("/checkCaptcha", captchaCtrl.CheckCaptcha)
+		// 手机登录/加密参数 anon
+		group.POST("/phoneLogin", loginCtrl.PhoneLogin)
+		group.GET("/getEncryptedString", loginCtrl.GetEncryptedString)
+		// 本地静态预览 anon（ShiroConfig.java:88 图片预览与下载不限 token）
+		group.GET("/common/static/*path", uploadCtrl.Static)
+	})
+
+	// 教学/门户域 anon：这些控制器在 Java 中是顶层 @RequestMapping("/teaching/...")
+	// 与 WebSocket /websocket/{userId}，前端以 baseURL=/api 调用 → 真实路径
+	// /api/teaching/... 与 /api/websocket/...；不得放进 /api/sys 组
+	// （否则实际路径多出 /sys 前缀，前端 404 且路由守卫启动即失败）。
+	s.Group("/api", func(group *ghttp.RouterGroup) {
 		// WebSocket 实时推送 anon（ShiroConfig.java:129）——Java 消息 JSON 形状
 		group.GET("/websocket/{userId}", wsHub.Handler)
-		// 手机登录/加密参数 anon
-		group.POST("/sys/phoneLogin", loginCtrl.PhoneLogin)
-		group.GET("/sys/getEncryptedString", loginCtrl.GetEncryptedString)
 		// 课程域 anon（ShiroConfig.java:158 首页未登录可调）
 		group.GET("/teaching/teachingCourse/getHomeCourse", courseCtrl.GetHomeCourse)
 		// 门户菜单 anon（ShiroConfig.java:145）
 		group.GET("/teaching/menu/getUserMenu", teachingMenuCtrl.GetUserMenu)
-		// 本地静态预览 anon（ShiroConfig.java:88 图片预览与下载不限 token）
-		group.GET("/sys/common/static/*path", uploadCtrl.Static)
 		// 作业域 anon（ShiroConfig.java:152-157）
 		group.GET("/teaching/teachingWork/userInfo", teachingWorkCtrl.GetUserInfo)
 		group.GET("/teaching/teachingWork/studentWorkInfo", teachingWorkCtrl.GetStudentWorkInfo)

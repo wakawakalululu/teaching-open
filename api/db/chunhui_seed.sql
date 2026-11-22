@@ -95,6 +95,15 @@ INSERT INTO sys_user (id, username, realname, password, salt, avatar, birthday, 
  ('ch_user_stu6',     'student6', '吴小婷',     '$2a$12$8oFhzs/lBg4XyO5KOQTFTeOpkB51zq.FFje9iA7J4iouC/bsyPjHC', '', NULL, '2016-02-25', 2, NULL, NULL, 'A01A04',    1, 0, 1, NULL, NULL, '春晖青少年编程中心', '', 'admin', '2026-09-07 00:00:00', 1, 'ch_depart_05');
 
 -- ============================================================
+-- 4.5 管理员角色授权（sys_role_permission）
+-- QueryByUser 严格按 sys_role_permission 过滤（无 admin 旁路），
+-- 不绑定则动态管理菜单为空（与 Java 演示数据的角色授权模式一致）。
+-- ============================================================
+DELETE FROM sys_role_permission WHERE role_id = 'ch_role_admin';
+INSERT INTO sys_role_permission (id, role_id, permission_id)
+SELECT MD5(CONCAT('ch_rp_', id)), 'ch_role_admin', id FROM sys_permission;
+
+-- ============================================================
 -- 5. 用户-角色（sys_user_role）
 -- ============================================================
 DELETE FROM sys_user_role;
