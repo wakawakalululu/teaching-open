@@ -1,8 +1,12 @@
-// captcha_test.go 验证码域零 DB 依赖单测：realKey 构造、内存 KV 校验链路。
+// captcha_test.go 验证码域零 DB 依赖单测：realKey 构造、内存 KV 校验链路、
+// 字形渲染（PNG 可解码且含足量深色字形像素）。
 package captcha
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"image/png"
 	"strings"
 	"testing"
 )
@@ -48,5 +52,35 @@ func TestRenderPNGShape(t *testing.T) {
 	}
 	if !strings.HasPrefix(dataURI, "data:image/png;base64,") {
 		t.Fatalf("data-uri 前缀异常: %s", dataURI[:40])
+	}
+	// 解码校验：尺寸 90x30，且存在足量深色字形像素（点阵字形可读性保障）
+	b64 := strings.TrimPrefix(dataURI, "data:image/png;base64,")
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		t.Fatalf("base64 解码失败: %v", err)
+	}
+	img, err := png.Decode(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("png 解码失败: %v", err)
+	}
+	b := img.Bounds()
+	if b.Dx() != 90 || b.Dy() != 30 {
+		t.Fatalf("画布尺寸应为 90x30: %dx%d", b.Dx(), b.Dy())
+	}
+	dark := 0
+	for y := 0; y < b.Dy(); y++ {
+		for x := 0; x < b.Dx(); x++ {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			// 深色字形：最大通道 < 45000（16 位域）——覆盖全部深色调色板
+			// （最浅通道 130×257≈33410），排除背景 250 与干扰灰 205。
+			if r < 45000 && g < 45000 && bl < 45000 {
+				dark++
+			}
+		}
+	}
+	// 4 个数字字形（'1'/'2'/'3'/'4' 点阵像素 10/14/15/16 × 2x2 放大 ≈ 220，
+	// 扣除画布边缘裁切），阈值取实测下限。
+	if dark < 150 {
+		t.Fatalf("深色字形像素不足，字形可能未渲染: dark=%d", dark)
 	}
 }

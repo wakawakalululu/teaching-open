@@ -9,9 +9,10 @@
 //     构造 realKey 查 Redis；不匹配 →「验证码错误」；captcha 缺失 →
 //     「验证码无效」。
 //
-// 图片生成：Go 端以标准库 image/png 绘制 4 位数字干拢线验证码（Java 用
-// RandImageUtil——自绘等价实现，输出 data:image/png;base64 前缀保持前端
-// <img :src> 直用）。
+// 图片生成：Go 端以标准库 image/png 绘制 4 位数字 5x7 点阵验证码（对齐
+// Java RandImageUtil 的可读数字输出——早期实现用空心矩形+点数编码，数字
+// 0 为空框、多位数无法辨认，2026-11-22 起改为真实字形渲染），输出
+// data:image/png;base64 前缀保持前端 <img :src> 直用。
 package captcha
 
 import (
@@ -79,23 +80,44 @@ func (s *Service) Check(ctx context.Context, captcha, checkKey string) error {
 }
 
 // renderPNG 绘制 90x30 PNG（数字 + 干扰线），返回 data:image/png;base64 串。
+// digitFont5x7 数字 5x7 点阵字形（经典 X11 字形，'#' 为实点）。
+var digitFont5x7 = [10][7]string{
+	{".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."}, // 0
+	{"..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."}, // 1
+	{".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"}, // 2
+	{"####.", "....#", "....#", ".###.", "....#", "....#", "####."}, // 3
+	{"...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."}, // 4
+	{"#####", "#....", "#....", "####.", "....#", "#...#", ".###."}, // 5
+	{"..##.", ".#..#", "#....", "####.", "#...#", "#...#", ".###."}, // 6
+	{"#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."}, // 7
+	{".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."}, // 8
+	{".###.", "#...#", "#...#", ".####", "....#", "...#.", ".##.."}, // 9
+}
+
+// darkPalette 字符配色（深色系，浅底高对比，避开干扰线灰度）。
+var darkPalette = []color.RGBA{
+	{40, 40, 40, 255}, {35, 70, 130, 255}, {130, 40, 40, 255},
+	{30, 100, 60, 255}, {70, 40, 120, 255},
+}
+
 func renderPNG(code string) (string, error) {
 	const (
 		w = 90
 		h = 30
 	)
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
-	// 背景
+	// 背景（近白）
+	bg := color.RGBA{250, 250, 250, 255}
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			img.Set(x, y, color.RGBA{245, 245, 245, 255})
+			img.Set(x, y, bg)
 		}
 	}
-	// 干扰线
-	for i := 0; i < 5; i++ {
-		c := color.RGBA{uint8(rand.Intn(160)), uint8(rand.Intn(160)), uint8(rand.Intn(160)), 255}
+	// 轻干扰线（浅灰细线，不压盖字形对比度）
+	for i := 0; i < 2; i++ {
+		c := color.RGBA{205, 205, 205, 255}
 		x0, y0 := rand.Intn(w), rand.Intn(h)
-		for step := 0; step < 30; step++ {
+		for step := 0; step < w; step++ {
 			x := x0 + step
 			y := y0 + rand.Intn(3) - 1
 			if x < w && y >= 0 && y < h {
@@ -103,24 +125,26 @@ func renderPNG(code string) (string, error) {
 			}
 		}
 	}
-	// 字符（简易 5x7 点阵式竖条渲染：每个字符一个竖条块，可读性优先于美观）
+	// 字符：5x7 点阵字形 × 2 倍缩放（10x14），每字随机深色 + ±2 垂直抖动
 	for i, ch := range code {
-		c := color.RGBA{uint8(rand.Intn(120)), uint8(rand.Intn(120)), uint8(rand.Intn(120)), 255}
+		glyph := digitFont5x7[ch-'0']
+		c := darkPalette[rand.Intn(len(darkPalette))]
 		x0 := 12 + i*18
-		y0 := 8 + rand.Intn(6)
-		for dy := 0; dy < 14; dy++ {
-			for dx := 0; dx < 8; dx++ {
-				// 空心矩形轮廓
-				if dx == 0 || dx == 7 || dy == 0 || dy == 13 {
-					if x0+dx < w && y0+dy < h {
-						img.Set(x0+dx, y0+dy, c)
+		y0 := 8 + rand.Intn(5)
+		for gy := 0; gy < 7; gy++ {
+			for gx := 0; gx < 5; gx++ {
+				if glyph[gy][gx] != '#' {
+					continue
+				}
+				for dy := 0; dy < 2; dy++ {
+					for dx := 0; dx < 2; dx++ {
+						px, py := x0+gx*2+dx, y0+gy*2+dy
+						if px >= 0 && px < w && py >= 0 && py < h {
+							img.Set(px, py, c)
+						}
 					}
 				}
 			}
-		}
-		// 字符竖条标识位（区分数字：绘制 ch 数量的点）
-		for k := 0; k < int(ch-'0'); k++ {
-			img.Set(x0+2+k%4, y0+3+k/4, c)
 		}
 	}
 	// 编码
