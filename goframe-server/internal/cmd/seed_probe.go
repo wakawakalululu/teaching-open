@@ -49,7 +49,7 @@ func probeAdminTables(ctx context.Context) {
 		return
 	}
 	g.Log().Warningf(ctx, "种子探针：%d 张管理页关键表为空 [%s]，相关页面会显示「暂无数据」。"+
-		"请执行 tools/chseed 或 api/db/chunhui_seed.sql 回填。",
+		"请执行 tools/chseed -layer base（及 -layer demo）或 api/db/chunhui_seed_{base,demo}.sql 回填。",
 		len(warns), strings.Join(warns, ", "))
 	_ = fmt.Sprintf
 }

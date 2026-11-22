@@ -552,4 +552,4 @@ $ go test ./... -count=1    → 5 个包全部 ok，44 项测试通过
 - 内容域：4 公告 + 13 阅读标记 + 4 资讯。
 - 作品域：12 作品（3 门课 × 学员）+ 6 封面 PNG（渐变实图）+ 12 .sb3 占位 + 6 互评。
 - 配置域：10 条（brandName/_address/_copyRight/_indexHtml/_homeHtml/_workShareHtml 等）。
-- 双路径：chseed（Go，含二进制生成）与 chunhui_seed.sql（纯 SQL，二进制除外）均已实测入库。
+- 双路径：chseed（Go，含二进制生成）与 chunhui_seed_base.sql + chunhui_seed_demo.sql（纯 SQL，二进制除外）均已实测入库。

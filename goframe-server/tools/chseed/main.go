@@ -11,12 +11,14 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	"github.com/gogf/gf/v2/database/gdb"
@@ -24,7 +26,7 @@ import (
 	"github.com/gogf/gf/v2/os/genv"
 )
 
-// 品牌常量（与 api/db/chunhui_seed.sql 保持一致）。
+// 品牌常量（与 api/db/chunhui_seed_base.sql / _demo.sql 保持一致）。
 const (
 	brandName   = "春晖青少年编程中心"
 	ownerName   = "武胜县沿口春夏秋信息技术中心（个体工商户）"
@@ -34,6 +36,9 @@ const (
 )
 
 func main() {
+	layer := flag.String("layer", "all", "种子层级：base（系统表）| demo（业务示例）| all（两者）")
+	flag.Parse()
+
 	// 端口约定：MariaDB 13306（高端口防冲突）；可经环境变量 MYSQL_LINK 覆盖。
 	link := os.Getenv("MYSQL_LINK")
 	if link == "" {
@@ -50,18 +55,49 @@ func main() {
 		fmt.Println("数据库连接失败:", err)
 		os.Exit(1)
 	}
-	fmt.Println("数据库连接正常")
+	fmt.Println("数据库连接正常，层级 =", *layer)
 
-	// 1. 清除旧数据
-	for _, t := range []string{"sys_config", "sys_depart", "sys_user", "sys_user_role", "sys_user_depart",
-		"teaching_course", "teaching_course_unit", "teaching_course_dept", "sys_announcement", "sys_announcement_send",
-		"teaching_news", "sys_file", "teaching_work", "teaching_work_comment",
-		"sys_position", "sys_data_source", "sys_sms_template", "sys_depart_role"} {
+	switch strings.ToLower(*layer) {
+	case "base":
+		seedBaseLayer()
+	case "demo":
+		seedDemoLayer()
+	case "all", "":
+		seedBaseLayer()
+		seedDemoLayer()
+	default:
+		fmt.Println("未知层级:", *layer, "（可选 base|demo|all）")
+		os.Exit(1)
+	}
+
+	fmt.Println("✓ 春晖青少年编程中心种子数据导入完成（layer =", *layer, "）")
+}
+
+// baseTables BASE 层清除范围：仅系统表（登录与后台运营所必需的数据）。
+var baseTables = []string{
+	"sys_config", "sys_depart", "sys_user", "sys_user_role", "sys_user_depart",
+	"sys_position", "sys_data_source", "sys_sms_template", "sys_depart_role",
+}
+
+// demoTables DEMO 层清除范围：仅业务示例表。
+var demoTables = []string{
+	"teaching_course", "teaching_course_unit", "teaching_course_dept",
+	"sys_announcement", "sys_announcement_send", "teaching_news",
+	"teaching_work", "teaching_work_comment",
+}
+
+// seedBaseLayer 系统表层：组织、账号、授权、后台基础数据、菜单可见性。
+func seedBaseLayer() {
+	for _, t := range baseTables {
 		if _, err := g.DB().Exec(context.Background(), "DELETE FROM "+t); err != nil {
 			fmt.Printf("清除 %s 失败: %v\n", t, err)
 		}
 	}
-	fmt.Println("旧数据已清除")
+	if _, err := g.DB().Exec(context.Background(),
+		"DELETE FROM sys_role_permission WHERE role_id = ?", "ch_role_admin"); err != nil {
+		fmt.Printf("清除管理员授权失败: %v\n", err)
+	}
+	fmt.Println("BASE 层旧数据已清除")
 
 	seedDeparts()
 	seedRoles()
@@ -70,6 +106,23 @@ func main() {
 	seedUserRoles()
 	seedUserDeparts()
 	seedConfigs()
+	seedAdminBase()
+	hideUnavailableMenus()
+}
+
+// seedDemoLayer 业务示例层：课程/单元/公告/资讯/作品/评论 + 二进制资源。
+func seedDemoLayer() {
+	for _, t := range demoTables {
+		if _, err := g.DB().Exec(context.Background(), "DELETE FROM "+t); err != nil {
+			fmt.Printf("清除 %s 失败: %v\n", t, err)
+		}
+	}
+	if _, err := g.DB().Exec(context.Background(),
+		"DELETE FROM sys_file WHERE id LIKE ? OR id LIKE ?", "ch_file_%", "ch_work_%_file"); err != nil {
+		fmt.Printf("清除示例文件登记失败: %v\n", err)
+	}
+	fmt.Println("DEMO 层旧数据已清除")
+
 	seedCourses()
 	seedUnits()
 	seedCourseDepts()
@@ -80,9 +133,24 @@ func main() {
 	seedMaps()
 	seedWorks()
 	seedWorkComments()
-	seedAdminBase()
+}
 
-	fmt.Println("✓ 春晖青少年编程中心种子数据导入完成")
+// hideUnavailableMenus 隐藏本部署未实现的模块菜单（对齐 chunhui_seed_base.sql §15）。
+func hideUnavailableMenus() {
+	const stmt = `UPDATE sys_permission SET hidden = 1
+ WHERE hidden = 0
+   AND (url LIKE '/online/%'
+        OR url LIKE '/modules/bpm/%'
+        OR url LIKE '/modules/extbpm/%'
+        OR url = '/exception/404')`
+	res, err := g.DB().Exec(context.Background(), stmt)
+	if err != nil {
+		fmt.Printf("隐藏未启用菜单失败: %v\n", err)
+		return
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		fmt.Printf("未启用模块菜单已隐藏 %d 条\n", n)
+	}
 }
 
 // seedDeparts 部门/班级：春晖中心 → 教学部 + 三个班。

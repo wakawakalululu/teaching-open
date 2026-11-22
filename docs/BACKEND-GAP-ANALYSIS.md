@@ -36,7 +36,7 @@ sys_depart_role 0 · sys_depart_permission 0 · sys_log 0 · sys_data_log 0
 ```
 
 于是页面渲染正常、接口返回 200，但表格是「暂无数据」——用户感知为「功能没做」。
-**处置**：`chseed` 新增 `seedAdminBase()`，`chunhui_seed.sql` 新增第 14 节：
+**处置**：`chseed` 新增 `seedAdminBase()`，`chunhui_seed_base.sql` 第 14 节：
 职务 5 / 数据源 1 / 消息模板 3 / 部门角色 3。
 
 ### B. Excel 域未注册（真实缺口，影响「导出/导入」按钮）
@@ -91,7 +91,7 @@ Go 侧按 REST 语义只注册了 `PUT`/`POST`：
 | Excel 域补全（12 域 × 3） | `service/excelx/registry.go`、`controller/excelx/excelx.go`、`cmd/register_p2_6.go` | +36 |
 | 方法别名与遗漏端点 | `cmd/register_gaps.go`、`cmd/cmd.go` | +18 |
 | 字典通用表树（白名单） | `service/dict/dict.go`、`controller/dict/dict.go` | +1 |
-| 管理基础数据回填 | `tools/chseed/main.go`、`api/db/chunhui_seed.sql` | 12 行数据 |
+| 管理基础数据回填 | `tools/chseed/main.go`、`api/db/chunhui_seed_base.sql` | 12 行数据 |
 
 验证证据：
 - 路由转储：**454 条**（原 403），Java 对账覆盖率 **89.5%**、方法差异 **0**。
@@ -123,7 +123,7 @@ Go 侧按 REST 语义只注册了 `PUT`/`POST`：
    → 断言 Go 路由存在（当前为一次性脚本）。防止后续回退。
 
 ### P2 数据治理（2~4 周）
-6. **种子分层**：把 `chunhui_seed.sql` 拆成 `base`（系统表）与 `demo`（业务示例）
+6. **种子分层**：把 `chunhui_seed.sql` 拆成 `base`（系统表）与 `demo`（业务示例）—— ✅ 2026-11-22 已完成
    两层，避免再次出现「换业务数据顺手清空系统表」。
 7. **空表可观测**：启动时对管理页依赖的表做行数探针，空表打 WARN 日志，
    把「感觉功能坏了」变成「日志里的一行告警」。
@@ -185,7 +185,7 @@ node build/probe_admin.js   # 输出 /tmp/admin_probe.json
 | 项 | 交付 | 证据 |
 | --- | --- | --- |
 | 空表探针 | `internal/cmd/seed_probe.go`：启动时统计 12 张管理页关键表，空表打 WARN 并提示回填命令；`emptyTableWarnings` 纯函数单测覆盖 | 启动日志 `种子探针：12 张关键表均有数据` |
-| 未启用模块菜单隐藏 | `chunhui_seed.sql` 第 15 节：`online/*`、`bpm`、`extbpm`、`/exception/404` 统一 `hidden=1`，避免点击后 404 | 复查 SQL：`hidden=0` 的不存在模块菜单数 = 0 |
+| 未启用模块菜单隐藏 | `chunhui_seed_base.sql` 第 15 节：`online/*`、`bpm`、`extbpm`、`/exception/404` 统一 `hidden=1`，避免点击后 404 | 复查 SQL：`hidden=0` 的不存在模块菜单数 = 0 |
 
 ### 6.5 本轮门禁
 
@@ -204,3 +204,29 @@ Puppeteer 逐页巡检 24 个管理页（含工作台/字典/权限/角色/文�
 
 结论：§1 表中 A/B/C 三类根因全部消除；D 类按 §4 的 P3 以「菜单隐藏 + 显式拒绝」
 方式处理，不再产生用户可见的 404。
+
+### 6.7 P2-6 种子分层落地（2026-11-22）
+
+**分层结果**
+
+| 层 | 文件 | 内容 | 清除范围 |
+| --- | --- | --- | --- |
+| base | `api/db/chunhui_seed_base.sql` | 配置 10 / 部门 5 / 角色 4 / 管理员授权 138 / 用户 10 / 用户角色 10 / 用户班级 13 / 职务 5 / 数据源 1 / 消息模板 3 / 部门角色 3 / 菜单可见性 | 仅系统表 + `ch_role_admin` 授权 |
+| demo | `api/db/chunhui_seed_demo.sql` | 课程 6 / 单元 22 / 课程授权 6 / 公告 4 + 阅读标记 13 / 资讯 4 / 文件登记 24 / 作品 12 / 互评 6 | 仅业务表 + `ch_file_*`、`ch_work_*_file` 文件登记 |
+| 兼容入口 | `api/db/chunhui_seed.sql` | 说明性 stub（无 SQL，避免与两层漂移） | — |
+
+**Go 工具同构**：`go run ./tools/chseed -layer base|demo|all`（默认 all）。
+base 与 demo 各自独立清表，互不越界 —— 生产环境可只跑 base，
+或在业务数据稳定后单独重放 demo 而不影响账号体系。
+
+**实测证据（隔离性验证）**
+
+1. 清空业务表 → `-layer base`：
+   `sys_user=10 · sys_position=5 · sys_role_permission(ch_role_admin)=138 · teaching_course=0 · teaching_work=0`
+   登录成功；`/sys/user/list` 10 条、`/sys/position/list` 5 条、权限树 200；
+   业务接口 `/teaching/teachingCourse/list` 200 但 total=0 —— 后台可用、业务为空，符合 base 语义。
+2. 接着 `-layer demo`：
+   `teaching_course=6 · unit=22 · course_dept=6 · work=12 · news=4 · ann=4 · cover=12 · comment=6`
+   业务接口 total 分别为 6/22/12/4/4，全部 200。
+3. SQL 路径同样顺序执行 `chunhui_seed_base.sql` → `chunhui_seed_demo.sql`，计数与上表一致；
+   `hidden=0` 的未启用模块菜单数 = 0。
