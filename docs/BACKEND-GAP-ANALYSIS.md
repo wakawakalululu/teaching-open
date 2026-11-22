@@ -179,3 +179,18 @@ node build/probe_admin.js   # 输出 /tmp/admin_probe.json
 2. **种子分层**（P2）：`base`（系统表）/`demo`（业务示例）拆分，避免再次清空系统表。
 3. **空表探针**（P2）：启动时对管理页依赖表做行数检查并打 WARN。
 4. **未启用模块菜单置灰**（P3）：在线表单/工作流/CAS 在菜单层标注，避免 404 错觉。
+
+### 6.4 P2 数据治理落地（同日）
+
+| 项 | 交付 | 证据 |
+| --- | --- | --- |
+| 空表探针 | `internal/cmd/seed_probe.go`：启动时统计 12 张管理页关键表，空表打 WARN 并提示回填命令；`emptyTableWarnings` 纯函数单测覆盖 | 启动日志 `种子探针：12 张关键表均有数据` |
+| 未启用模块菜单隐藏 | `chunhui_seed.sql` 第 15 节：`online/*`、`bpm`、`extbpm`、`/exception/404` 统一 `hidden=1`，避免点击后 404 | 复查 SQL：`hidden=0` 的不存在模块菜单数 = 0 |
+
+### 6.5 本轮门禁
+
+`gofmt -l` 无输出 · `go vet ./...` OK · `go test ./... -count=1` 全部通过，其中新增：
+- `TestRouteGuardsAreRegistered`（310 守卫 / 472 注册）
+- `TestJavaContractCoverage`（372/372 = 100%）
+- `TestSpecsMatchSchema`（27 Excel 域）
+- `TestEmptyTableWarnings`（探针纯函数）

@@ -252,6 +252,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		return err
 	}
 	g.Log().Infof(ctx, "数据库连接正常")
+	// P2 种子完备度探针：管理页关键表为空时 WARN（不阻断启动）
+	probeAdminTables(ctx)
 
 	// 2.2 存量密码迁移进度统计（只读，用于评估 weakest-link 规模）
 	if total, bcryptCount, statErr := reportLegacyAccounts(ctx); statErr != nil {

@@ -357,3 +357,15 @@ INSERT INTO sys_depart_role (id, depart_id, role_name, role_code, description, c
  ('ch_dr_01', 'ch_depart_03', 'Scratch班管理员',  'scratch_admin', 'Scratch启蒙班班级管理', 'admin', '2026-09-07 00:00:00'),
  ('ch_dr_02', 'ch_depart_04', 'Python班管理员',   'python_admin',  'Python进阶班班级管理',  'admin', '2026-09-07 00:00:00'),
  ('ch_dr_03', 'ch_depart_05', '机器人班管理员',   'robot_admin',   '机器人竞赛班班级管理',  'admin', '2026-09-07 00:00:00');
+
+-- ============================================================
+-- 15. 未启用模块菜单隐藏（避免点击后 404 造成「系统坏了」的错觉）
+-- 在线表单（online/*）、工作流（bpm/extbpm）、404 示例页在本部署未实现，
+-- 统一置 hidden=1（Jeecg 前端不再渲染该菜单项，路由与数据保留）。
+-- ============================================================
+UPDATE sys_permission SET hidden = 1
+ WHERE hidden = 0
+   AND (url LIKE '/online/%'
+        OR url LIKE '/modules/bpm/%'
+        OR url LIKE '/modules/extbpm/%'
+        OR url = '/exception/404');
