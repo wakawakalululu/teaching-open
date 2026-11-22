@@ -12,7 +12,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"os"
+	"path/filepath"
 
 	_ "github.com/gogf/gf/contrib/drivers/mysql/v2"
 	"github.com/gogf/gf/v2/database/gdb"
@@ -45,7 +49,8 @@ func main() {
 
 	// 1. 清除旧数据
 	for _, t := range []string{"sys_config", "sys_depart", "sys_user", "sys_user_role", "sys_user_depart",
-		"teaching_course", "teaching_course_unit", "teaching_course_dept", "sys_announcement", "sys_announcement_send"} {
+		"teaching_course", "teaching_course_unit", "teaching_course_dept", "sys_announcement", "sys_announcement_send",
+		"teaching_news", "sys_file", "teaching_work", "teaching_work_comment"} {
 		if _, err := g.DB().Exec(context.Background(), "DELETE FROM "+t); err != nil {
 			fmt.Printf("清除 %s 失败: %v\n", t, err)
 		}
@@ -64,6 +69,10 @@ func main() {
 	seedCourseDepts()
 	seedAnnouncements()
 	seedAnnouncementSends()
+	seedNews()
+	seedFiles()
+	seedWorks()
+	seedWorkComments()
 
 	fmt.Println("✓ 春晖青少年编程中心种子数据导入完成")
 }
@@ -270,27 +279,27 @@ func seedCourses() {
 		{"id": "ch_course_01", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Scratch 创意编程启蒙",
 			"course_desc": `<h2>Scratch 图形化编程启蒙课程</h2><p>适合 6-9 岁零基础学员。通过 MIT 开发的 Scratch 图形化编程工具，孩子可以像搭积木一样拖拽代码块，创作属于自己的互动故事、动画和小游戏。</p><h3>课程亮点</h3><ul><li>零门槛入门，无需打字基础</li><li>项目式学习，每节课完成一个作品</li><li>培养逻辑思维、创造力与问题解决能力</li><li>小班教学（8人/班），确保每个孩子得到关注</li></ul><h3>适合年龄</h3><p>6-9 岁（小学 1-3 年级）</p>`,
-			"show_type": 1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 1, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
+			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 1, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
 		{"id": "ch_course_02", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Python 代码编程进阶",
 			"course_desc": `<h2>Python 代码编程进阶课程</h2><p>适合 10-14 岁有一定编程基础的学员。从图形化编程过渡到真正的代码编程，学习 Python 语法、数据结构、算法与项目开发。</p><h3>课程亮点</h3><ul><li>从积木到代码的平滑过渡</li><li>涵盖 Turtle绘图、Pygame游戏开发、数据分析入门</li><li>培养算法思维与工程能力</li><li>完成多个实战项目</li></ul><h3>适合年龄</h3><p>10-14 岁（小学 4 年级 - 初中）</p>`,
-			"show_type": 1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 2, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
+			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 2, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
 		{"id": "ch_course_03", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "机器人搭建与竞赛",
 			"course_desc": `<h2>机器人搭建与竞赛课程</h2><p>适合 8-14 岁学员。学习机器人机械结构搭建、传感器应用与编程控制，备战各类机器人竞赛。</p><h3>课程亮点</h3><ul><li>硬件+软件结合，动手与动脑并行</li><li>竞赛导向训练，参与省市机器人竞赛</li><li>团队协作与项目管理能力培养</li></ul><h3>适合年龄</h3><p>8-14 岁（小学 2 年级 - 初中）</p>`,
-			"show_type": 1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 3, "depart_ids": "ch_depart_05", "course_type": "2", "course_category": "1"},
+			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 3, "depart_ids": "ch_depart_05", "course_type": "2", "course_category": "1"},
 		{"id": "ch_course_04", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Scratch 游戏设计专项",
 			"course_desc": `<h2>Scratch 游戏设计专项课程</h2><p>在掌握 Scratch 基础操作后，深入学习游戏设计原理：碰撞检测、计分系统、多关卡设计、音效与动画。学员将独立完成 3 个完整游戏作品。</p><h3>课程亮点</h3><ul><li>游戏化学习，激发兴趣</li><li>涵盖游戏设计核心概念</li><li>作品可在 Scratch 社区分享</li></ul><h3>适合年龄</h3><p>7-10 岁（已完成 Scratch 启蒙）</p>`,
-			"show_type": 1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 4, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
+			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 4, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
 		{"id": "ch_course_05", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Python 数据可视化入门",
 			"course_desc": `<h2>Python 数据可视化入门课程</h2><p>学习使用 Matplotlib 和 Pandas 进行数据处理与可视化，制作漂亮的图表和报告。</p><h3>课程亮点</h3><ul><li>真实数据集分析（天气、运动、社交媒体）</li><li>培养数据思维与审美</li><li>为后续人工智能学习打基础</li></ul><h3>适合年龄</h3><p>11-14 岁（已掌握 Python 基础）</p>`,
-			"show_type": 1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 5, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
+			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 5, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
 		{"id": "ch_course_06", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "信息学奥赛 CSP-J 入门",
 			"course_desc": `<h2>信息学奥赛 CSP-J 入门课程</h2><p>面向准备参加 CSP-J（入门级）认证的学员，系统学习 C++ 语法、基础算法与数据结构。</p><h3>课程亮点</h3><ul><li>竞赛导向，系统训练</li><li>涵盖历年真题解析</li><li>一对一作业批改与竞赛策略指导</li></ul><h3>适合年龄</h3><p>12-14 岁（已具备 Python 基础，准备学习 C++）</p>`,
-			"show_type": 1, "course_map": 0, "is_shared": 0, "show_home": 0, "order_num": 6, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
+			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 0, "order_num": 6, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
 	}
 	for _, c := range courses {
 		g.DB().Model("teaching_course").Data(c).Save()
@@ -423,22 +432,22 @@ func seedAnnouncements() {
 	anns := []map[string]interface{}{
 		{"id": "ch_ann_01", "titile": brandName + " 2026 秋季学期开学通知",
 			"msg_content": "<p>各位家长、同学：</p><p>" + brandName + " 2026 年秋季学期将于 9 月 10 日正式开课，请按时到校。</p><p>上课地址：武胜县沿口镇上东街257号（邮编638400）</p><p>—— " + ownerName + "</p>",
-			"start_time": "2026-09-01 00:00:00", "end_time": "2027-01-31 23:59:59", "sender": "admin", "priority": "H",
+			"start_time":  "2026-09-01 00:00:00", "end_time": "2027-01-31 23:59:59", "sender": "admin", "priority": "H",
 			"msg_category": "1", "msg_type": "ALL", "send_status": "1", "send_time": "2026-09-01 08:00:00",
 			"del_flag": "0", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "msg_abstract": "秋季学期开学通知"},
 		{"id": "ch_ann_02", "titile": "Scratch 创意编程启蒙班课程安排",
 			"msg_content": "<p>Scratch 启蒙班每周六上午 9:00-11:00 上课，请提前 10 分钟到教室（2楼 Scratch教室）。</p>",
-			"start_time": "2026-09-01 00:00:00", "end_time": "2027-01-31 23:59:59", "sender": "teacher1", "priority": "M",
+			"start_time":  "2026-09-01 00:00:00", "end_time": "2027-01-31 23:59:59", "sender": "teacher1", "priority": "M",
 			"msg_category": "1", "msg_type": "ALL", "send_status": "1", "send_time": "2026-09-05 08:00:00",
 			"del_flag": "0", "create_by": "teacher1", "create_time": "2026-09-07 00:00:00", "msg_abstract": "Scratch班课程安排"},
 		{"id": "ch_ann_03", "titile": "Python 进阶班新学期课程大纲发布",
 			"msg_content": "<p>Python 进阶班新学期将学习条件判断、循环结构、列表与字典等内容，请同学们提前预习第一课内容。</p>",
-			"start_time": "2026-09-01 00:00:00", "end_time": "2027-01-31 23:59:59", "sender": "teacher2", "priority": "M",
+			"start_time":  "2026-09-01 00:00:00", "end_time": "2027-01-31 23:59:59", "sender": "teacher2", "priority": "M",
 			"msg_category": "1", "msg_type": "ALL", "send_status": "1", "send_time": "2026-09-05 08:00:00",
 			"del_flag": "0", "create_by": "teacher2", "create_time": "2026-09-07 00:00:00", "msg_abstract": "Python班课程大纲"},
 		{"id": "ch_ann_04", "titile": "机器人竞赛班即将开启报名",
 			"msg_content": "<p>机器人竞赛班将于 10 月开始报名，名额有限（8人/班），请有意向的同学尽快联系陈教练。</p>",
-			"start_time": "2026-09-01 00:00:00", "end_time": "2026-10-31 23:59:59", "sender": "teacher3", "priority": "H",
+			"start_time":  "2026-09-01 00:00:00", "end_time": "2026-10-31 23:59:59", "sender": "teacher3", "priority": "H",
 			"msg_category": "1", "msg_type": "ALL", "send_status": "1", "send_time": "2026-09-05 08:00:00",
 			"del_flag": "0", "create_by": "teacher3", "create_time": "2026-09-07 00:00:00", "msg_abstract": "机器人竞赛班报名"},
 	}
@@ -469,4 +478,204 @@ func seedAnnouncementSends() {
 		g.DB().Model("sys_announcement_send").Data(a).Save()
 	}
 	fmt.Println("阅读标记 13 条已插入")
+}
+
+// seedNews 资讯（teaching_news，news_status>=1 才在门户 newsList 可见）。
+func seedNews() {
+	news := []map[string]interface{}{
+		{"id": "ch_news_01", "news_title": "春晖青少年编程中心 2026 秋季学期顺利开课",
+			"news_content": "<p>9 月 10 日，" + brandName + " 2026 年秋季学期正式开课。本学期开设 Scratch 创意编程启蒙、Python 代码编程进阶、机器人搭建与竞赛等 6 门课程，共 6 个教学班，学员 100 余人次。</p><p>经营场所：武胜县沿口镇上东街257号（邮编638400）。</p><p>—— " + ownerName + "</p>",
+			"news_status":  1, "create_by": "admin", "create_time": "2026-09-10 09:00:00"},
+		{"id": "ch_news_02", "news_title": "我中心学员在广安市青少年编程展演活动中获得佳绩",
+			"news_content": "<p>在近日举办的广安市青少年编程展演活动中，我中心 Scratch 启蒙班与 Python 进阶班共 6 名学员晋级展示环节，其中 2 名学员获得一等奖。</p><p>春晖编程将继续以项目式学习为核心，让每个孩子拥有创造未来的能力。</p>",
+			"news_status":  1, "create_by": "teacher1", "create_time": "2026-10-18 14:00:00"},
+		{"id": "ch_news_03", "news_title": "Scratch 创意编程公益公开课圆满结束",
+			"news_content": "<p>10 月下旬，中心举办公益公开课两场，共 30 组家庭参与。公开课围绕“图形化编程启蒙”主题，孩子们完成了自己的第一个动画作品。</p>",
+			"news_status":  1, "create_by": "teacher1", "create_time": "2026-10-30 16:00:00"},
+		{"id": "ch_news_04", "news_title": "寒假 Python 专项班与 CSP-J 冲刺班报名开始",
+			"news_content": "<p>寒假期间将开设 Python 数据可视化专项班与信息学奥赛 CSP-J 冲刺班，每班限额 8 人，报满即止。请联系各班讲师或到中心前台咨询。</p><p>地址：武胜县沿口镇上东街257号（邮编638400）。</p>",
+			"news_status":  1, "create_by": "teacher2", "create_time": "2026-11-15 10:00:00"},
+	}
+	for _, n := range news {
+		g.DB().Model("teaching_news").Data(n).Save()
+	}
+	fmt.Println("资讯 4 条已插入")
+}
+
+// workSeed 一条作品种子定义。
+type workSeed struct {
+	id     string
+	stu    string // sys_user id
+	course string
+	unit   string
+	name   string
+	status int // 3=已提交 4=已分享（leaderboard 过滤 work_status>=3）
+	star   int
+	view   int
+}
+
+var workSeeds = []workSeed{
+	{"ch_work_01", "ch_user_stu1", "ch_course_01", "ch_unit_01", "我的第一个动画：小猫说你好", 4, 12, 58},
+	{"ch_work_02", "ch_user_stu2", "ch_course_01", "ch_unit_02", "小猫追球", 4, 9, 41},
+	{"ch_work_03", "ch_user_stu1", "ch_course_01", "ch_unit_03", "会说话的角色", 3, 3, 17},
+	{"ch_work_04", "ch_user_stu3", "ch_course_02", "ch_unit_10", "Hello Python", 4, 11, 66},
+	{"ch_work_05", "ch_user_stu4", "ch_course_02", "ch_unit_12", "猜数字游戏", 4, 15, 73},
+	{"ch_work_06", "ch_user_stu3", "ch_course_02", "ch_unit_13", "Turtle 画星星", 3, 5, 22},
+	{"ch_work_07", "ch_user_stu5", "ch_course_03", "ch_unit_22", "循线机器人", 4, 8, 39},
+	{"ch_work_08", "ch_user_stu6", "ch_course_03", "ch_unit_21", "LED 流水灯", 4, 6, 28},
+	{"ch_work_09", "ch_user_stu5", "ch_course_03", "ch_unit_23", "避障小车", 3, 2, 13},
+	{"ch_work_10", "ch_user_stu1", "ch_course_04", "ch_unit_30", "接苹果", 4, 13, 61},
+	{"ch_work_11", "ch_user_stu2", "ch_course_04", "ch_unit_31", "打地鼠", 4, 10, 47},
+	{"ch_work_12", "ch_user_stu4", "ch_course_04", "ch_unit_32", "迷宫探险", 4, 4, 25},
+}
+
+// coverDef 封面定义：sys_file id + 渐变起止色。
+type coverDef struct {
+	id     string
+	c1, c2 [3]uint8
+}
+
+// coverDefs 六门课程的渐变封面（配色与门户 _homeHtml 卡片一致）。
+var coverDefs = []coverDef{
+	{"ch_file_cv01", [3]uint8{102, 126, 234}, [3]uint8{118, 75, 162}},
+	{"ch_file_cv02", [3]uint8{240, 147, 251}, [3]uint8{245, 87, 108}},
+	{"ch_file_cv03", [3]uint8{79, 172, 254}, [3]uint8{0, 242, 254}},
+	{"ch_file_cv04", [3]uint8{250, 200, 80}, [3]uint8{240, 120, 60}},
+	{"ch_file_cv05", [3]uint8{67, 233, 145}, [3]uint8{35, 166, 138}},
+	{"ch_file_cv06", [3]uint8{130, 140, 160}, [3]uint8{60, 70, 90}},
+}
+
+// seedFiles 生成作品封面（真实 PNG 渐变图）与 .sb3 作品占位文件，
+// 写入本地存储根目录并登记 sys_file（静态预览走 /api/sys/common/static/*path）。
+func seedFiles() {
+	root := os.Getenv("STORAGE_LOCAL_ROOT")
+	if root == "" {
+		root = "/tmp/chunhui_upload"
+	}
+	n := 0
+	for _, c := range coverDefs {
+		path := fmt.Sprintf("chunhui/covers/%s.png", c.id)
+		if err := writeGradientPNG(filepath.Join(root, filepath.FromSlash(path)), 480, 300, c.c1, c.c2); err != nil {
+			fmt.Printf("生成封面 %s 失败: %v\n", path, err)
+			continue
+		}
+		saveFile(c.id, "cover.png", path, 0)
+		n++
+	}
+	w := 0
+	for _, wk := range workSeeds {
+		path := fmt.Sprintf("chunhui/works/%s.sb3", wk.id)
+		body := fmt.Sprintf(`{"project":"%s","targets":[],"meta":{"platform":"Chunhui Scratch"}}`, wk.name)
+		abs := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+			fmt.Printf("创建目录失败: %v\n", err)
+			continue
+		}
+		if err := os.WriteFile(abs, []byte(body), 0o644); err != nil {
+			fmt.Printf("写入作品文件 %s 失败: %v\n", path, err)
+			continue
+		}
+		w++
+		saveFile(wk.id+"_file", wk.name+".sb3", path, 1)
+	}
+	fmt.Printf("作品文件 %d 个 + 封面 %d 张已生成并登记 sys_file\n", w, n)
+}
+
+// saveFile 登记一条 sys_file（file_type: 0=图片 1=作品；file_location 1=本地）。
+func saveFile(id, name, path string, fileType int) {
+	g.DB().Model("sys_file").Data(map[string]interface{}{
+		"id": id, "file_name": name, "file_path": path, "file_type": fileType,
+		"file_location": 1, "file_tag": "chunhui", "sys_org_code": "A01",
+		"create_by": "admin", "create_time": "2026-09-07 00:00:00", "del_flag": 0,
+	}).Save()
+}
+
+// writeGradientPNG 绘制 480x300 垂直双渐变色封面 PNG。
+func writeGradientPNG(abs string, w, h int, top, bottom [3]uint8) error {
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		return err
+	}
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		// 全程 int 域插值后再转 uint8：uint8 域直接相减会下溢（如 75-126）。
+		t := float64(y) / float64(h-1)
+		r := uint8(int(float64(top[0]) + (float64(bottom[0])-float64(top[0]))*t))
+		gg := uint8(int(float64(top[1]) + (float64(bottom[1])-float64(top[1]))*t))
+		b := uint8(int(float64(top[2]) + (float64(bottom[2])-float64(top[2]))*t))
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.RGBA{r, gg, b, 255})
+		}
+	}
+	f, err := os.Create(abs)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	return png.Encode(f, img)
+}
+
+// seedWorks 学员作品（teaching_work，work_status>=3 门户 leaderboard 可见）。
+func seedWorks() {
+	n := 0
+	for _, wk := range workSeeds {
+		// work_scene 列为 varchar(20)，仅存极简 JSON 标记。
+		_, err := g.DB().Model("teaching_work").Data(map[string]interface{}{
+			"id": wk.id, "create_by": wk.stu, "create_time": "2026-09-20 10:00:00",
+			"sys_org_code": "A01", "user_id": wk.stu,
+			"depart_id":   mapCourseDepart(wk.course),
+			"course_id":   wk.course,
+			"work_name":   wk.name,
+			"work_type":   1,
+			"work_file":   wk.id + "_file",
+			"work_cover":  coverOf(wk.course),
+			"work_status": wk.status,
+			"star_num":    wk.star, "collect_num": wk.star / 3, "view_num": wk.view,
+			"work_scene": `{"v":1}`, "has_cloud_data": 0,
+			"del_flag": 0,
+		}).Save()
+		if err != nil {
+			fmt.Printf("插入作品 %s 失败: %v\n", wk.id, err)
+			continue
+		}
+		n++
+	}
+	fmt.Printf("作品 %d 件已插入\n", n)
+}
+
+// mapCourseDepart 课程 → 授权班级。
+func mapCourseDepart(course string) string {
+	switch course {
+	case "ch_course_01", "ch_course_04":
+		return "ch_depart_03"
+	case "ch_course_02", "ch_course_05", "ch_course_06":
+		return "ch_depart_04"
+	default:
+		return "ch_depart_05"
+	}
+}
+
+// coverOf 课程 → 封面 sys_file id。
+func coverOf(course string) string {
+	m := map[string]string{
+		"ch_course_01": "ch_file_cv01", "ch_course_02": "ch_file_cv02",
+		"ch_course_03": "ch_file_cv03", "ch_course_04": "ch_file_cv04",
+		"ch_course_05": "ch_file_cv05", "ch_course_06": "ch_file_cv06",
+	}
+	return m[course]
+}
+
+// seedWorkComments 作品互评。
+func seedWorkComments() {
+	cmts := []map[string]interface{}{
+		{"id": "ch_wc_01", "work_id": "ch_work_01", "user_id": "ch_user_stu2", "comment": "小猫的造型切换好流畅，我也要试试！", "create_by": "ch_user_stu2", "create_time": "2026-09-21 09:00:00"},
+		{"id": "ch_wc_02", "work_id": "ch_work_01", "user_id": "ch_user_teacher1", "comment": "第一次就能完成完整动画，继续保持！", "create_by": "ch_user_teacher1", "create_time": "2026-09-21 10:00:00"},
+		{"id": "ch_wc_03", "work_id": "ch_work_05", "user_id": "ch_user_stu3", "comment": "猜数字的循环写得真棒，用了二分吗？", "create_by": "ch_user_stu3", "create_time": "2026-09-25 15:00:00"},
+		{"id": "ch_wc_04", "work_id": "ch_work_07", "user_id": "ch_user_stu6", "comment": "循线机器人转弯很稳，速度也快！", "create_by": "ch_user_stu6", "create_time": "2026-09-28 11:00:00"},
+		{"id": "ch_wc_05", "work_id": "ch_work_10", "user_id": "ch_user_stu5", "comment": "苹果接住时有音效，细节满分。", "create_by": "ch_user_stu5", "create_time": "2026-10-09 16:00:00"},
+		{"id": "ch_wc_06", "work_id": "ch_work_04", "user_id": "ch_user_teacher2", "comment": "代码缩进规范，注释也很清楚。", "create_by": "ch_user_teacher2", "create_time": "2026-10-11 09:30:00"},
+	}
+	for _, c := range cmts {
+		g.DB().Model("teaching_work_comment").Data(c).Save()
+	}
+	fmt.Println("作品评论 6 条已插入")
 }

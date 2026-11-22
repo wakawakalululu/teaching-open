@@ -250,3 +250,131 @@ INSERT INTO sys_announcement_send (id, annt_id, user_id, read_flag, read_time) V
  ('ch_as_11', 'ch_ann_02', 'ch_user_stu2',     '0', NULL),
  ('ch_as_12', 'ch_ann_04', 'ch_user_stu5',     '0', NULL),
  ('ch_as_13', 'ch_ann_04', 'ch_user_stu6',     '0', NULL);
+
+-- ============================================================
+-- 12. 资讯（teaching_news）——门户 newsList（news_status>=1 可见）
+-- ============================================================
+DELETE FROM teaching_news;
+INSERT INTO teaching_news (id, news_title, news_content, news_status, create_by, create_time) VALUES
+ ('ch_news_01', '春晖青少年编程中心 2026 秋季学期顺利开课',
+  '<p>9 月 10 日，春晖青少年编程中心 2026 年秋季学期正式开课。本学期开设 Scratch 创意编程启蒙、Python 代码编程进阶、机器人搭建与竞赛等 6 门课程。</p><p>经营场所：武胜县沿口镇上东街257号（邮编638400）。</p>', 1, 'admin', '2026-09-10 09:00:00'),
+ ('ch_news_02', '我中心学员在广安市青少年编程展演活动中获得佳绩',
+  '<p>在广安市青少年编程展演活动中，我中心 Scratch 启蒙班与 Python 进阶班共 6 名学员晋级展示环节，其中 2 名学员获得一等奖。</p>', 1, 'teacher1', '2026-10-18 14:00:00'),
+ ('ch_news_03', 'Scratch 创意编程公益公开课圆满结束',
+  '<p>10 月下旬，中心举办公益公开课两场，共 30 组家庭参与，孩子们完成了自己的第一个动画作品。</p>', 1, 'teacher1', '2026-10-30 16:00:00'),
+ ('ch_news_04', '寒假 Python 专项班与 CSP-J 冲刺班报名开始',
+  '<p>寒假期间将开设 Python 数据可视化专项班与信息学奥赛 CSP-J 冲刺班，每班限额 8 人，报满即止。</p><p>地址：武胜县沿口镇上东街257号（邮编638400）。</p>', 1, 'teacher2', '2026-11-15 10:00:00');
+
+-- ============================================================
+-- 13. 作品文件登记（sys_file）+ 学员作品（teaching_work）+ 互评
+-- 注意：封面 PNG 与 .sb3 占位文件为 chseed 工具生成的二进制产物
+-- （写入 STORAGE_LOCAL_ROOT），纯 SQL 部署时数据行完整、静态预览 404。
+-- ============================================================
+DELETE FROM sys_file WHERE id LIKE 'ch_file_%' OR id LIKE 'ch_work_%_file';
+INSERT INTO sys_file (id, file_name, file_path, file_type, file_location, file_tag, sys_org_code, create_by, create_time, del_flag) VALUES
+ ('ch_file_cv01', 'cover.png', 'chunhui/covers/ch_file_cv01.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv02', 'cover.png', 'chunhui/covers/ch_file_cv02.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv03', 'cover.png', 'chunhui/covers/ch_file_cv03.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv04', 'cover.png', 'chunhui/covers/ch_file_cv04.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv05', 'cover.png', 'chunhui/covers/ch_file_cv05.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv06', 'cover.png', 'chunhui/covers/ch_file_cv06.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_01_file', '我的第一个动画.sb3', 'chunhui/works/ch_work_01.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_02_file', '小猫追球.sb3', 'chunhui/works/ch_work_02.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_03_file', '会说话的角色.sb3', 'chunhui/works/ch_work_03.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_04_file', 'Hello Python.sb3', 'chunhui/works/ch_work_04.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_05_file', '猜数字游戏.sb3', 'chunhui/works/ch_work_05.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_06_file', 'Turtle 画星星.sb3', 'chunhui/works/ch_work_06.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_07_file', '循线机器人.sb3', 'chunhui/works/ch_work_07.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_08_file', 'LED 流水灯.sb3', 'chunhui/works/ch_work_08.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_09_file', '避障小车.sb3', 'chunhui/works/ch_work_09.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_10_file', '接苹果.sb3', 'chunhui/works/ch_work_10.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_11_file', '打地鼠.sb3', 'chunhui/works/ch_work_11.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_12_file', '迷宫探险.sb3', 'chunhui/works/ch_work_12.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0);
+
+DELETE FROM teaching_work;
+INSERT INTO teaching_work (id, create_by, create_time, sys_org_code, user_id, depart_id, course_id, work_name, work_type, work_file, work_cover, work_status, star_num, collect_num, view_num, work_scene, has_cloud_data, del_flag) VALUES
+ ('ch_work_01', 'ch_user_stu1', '2026-09-20 10:00:00', 'A01', 'ch_user_stu1', 'ch_depart_03', 'ch_course_01', '我的第一个动画：小猫说你好', 1, 'ch_work_01_file', 'ch_file_cv01', 4, 12, 4, 58, '{"v":1}', 0, 0),
+ ('ch_work_02', 'ch_user_stu2', '2026-09-20 10:00:00', 'A01', 'ch_user_stu2', 'ch_depart_03', 'ch_course_01', '小猫追球', 1, 'ch_work_02_file', 'ch_file_cv01', 4, 9, 3, 41, '{"v":1}', 0, 0),
+ ('ch_work_03', 'ch_user_stu1', '2026-09-20 10:00:00', 'A01', 'ch_user_stu1', 'ch_depart_03', 'ch_course_01', '会说话的角色', 1, 'ch_work_03_file', 'ch_file_cv01', 3, 3, 1, 17, '{"v":1}', 0, 0),
+ ('ch_work_04', 'ch_user_stu3', '2026-09-20 10:00:00', 'A01', 'ch_user_stu3', 'ch_depart_04', 'ch_course_02', 'Hello Python', 1, 'ch_work_04_file', 'ch_file_cv02', 4, 11, 3, 66, '{"v":1}', 0, 0),
+ ('ch_work_05', 'ch_user_stu4', '2026-09-20 10:00:00', 'A01', 'ch_user_stu4', 'ch_depart_04', 'ch_course_02', '猜数字游戏', 1, 'ch_work_05_file', 'ch_file_cv02', 4, 15, 5, 73, '{"v":1}', 0, 0),
+ ('ch_work_06', 'ch_user_stu3', '2026-09-20 10:00:00', 'A01', 'ch_user_stu3', 'ch_depart_04', 'ch_course_02', 'Turtle 画星星', 1, 'ch_work_06_file', 'ch_file_cv02', 3, 5, 1, 22, '{"v":1}', 0, 0),
+ ('ch_work_07', 'ch_user_stu5', '2026-09-20 10:00:00', 'A01', 'ch_user_stu5', 'ch_depart_05', 'ch_course_03', '循线机器人', 1, 'ch_work_07_file', 'ch_file_cv03', 4, 8, 2, 39, '{"v":1}', 0, 0),
+ ('ch_work_08', 'ch_user_stu6', '2026-09-20 10:00:00', 'A01', 'ch_user_stu6', 'ch_depart_05', 'ch_course_03', 'LED 流水灯', 1, 'ch_work_08_file', 'ch_file_cv03', 4, 6, 2, 28, '{"v":1}', 0, 0),
+ ('ch_work_09', 'ch_user_stu5', '2026-09-20 10:00:00', 'A01', 'ch_user_stu5', 'ch_depart_05', 'ch_course_03', '避障小车', 1, 'ch_work_09_file', 'ch_file_cv03', 3, 2, 0, 13, '{"v":1}', 0, 0),
+ ('ch_work_10', 'ch_user_stu1', '2026-09-20 10:00:00', 'A01', 'ch_user_stu1', 'ch_depart_03', 'ch_course_04', '接苹果', 1, 'ch_work_10_file', 'ch_file_cv04', 4, 13, 4, 61, '{"v":1}', 0, 0),
+ ('ch_work_11', 'ch_user_stu2', '2026-09-20 10:00:00', 'A01', 'ch_user_stu2', 'ch_depart_03', 'ch_course_04', '打地鼠', 1, 'ch_work_11_file', 'ch_file_cv04', 4, 10, 3, 47, '{"v":1}', 0, 0),
+ ('ch_work_12', 'ch_user_stu4', '2026-09-20 10:00:00', 'A01', 'ch_user_stu4', 'ch_depart_04', 'ch_course_04', '迷宫探险', 1, 'ch_work_12_file', 'ch_file_cv04', 4, 4, 1, 25, '{"v":1}', 0, 0);
+
+DELETE FROM teaching_work_comment;
+INSERT INTO teaching_work_comment (id, work_id, user_id, comment, create_by, create_time, sys_org_code) VALUES
+ ('ch_wc_01', 'ch_work_01', 'ch_user_stu2', '小猫的造型切换好流畅，我也要试试！', 'ch_user_stu2', '2026-09-21 09:00:00', 'A01'),
+ ('ch_wc_02', 'ch_work_01', 'ch_user_teacher1', '第一次就能完成完整动画，继续保持！', 'ch_user_teacher1', '2026-09-21 10:00:00', 'A01'),
+ ('ch_wc_03', 'ch_work_05', 'ch_user_stu3', '猜数字的循环写得真棒，用了二分吗？', 'ch_user_stu3', '2026-09-25 15:00:00', 'A01'),
+ ('ch_wc_04', 'ch_work_07', 'ch_user_stu6', '循线机器人转弯很稳，速度也快！', 'ch_user_stu6', '2026-09-28 11:00:00', 'A01'),
+ ('ch_wc_05', 'ch_work_10', 'ch_user_stu5', '苹果接住时有音效，细节满分。', 'ch_user_stu5', '2026-10-09 16:00:00', 'A01'),
+ ('ch_wc_06', 'ch_work_04', 'ch_user_teacher2', '代码缩进规范，注释也很清楚。', 'ch_user_teacher2', '2026-10-11 09:30:00', 'A01');
+
+-- ============================================================
+-- 12. 资讯（teaching_news）——门户 newsList（news_status>=1 可见）
+-- ============================================================
+DELETE FROM teaching_news;
+INSERT INTO teaching_news (id, news_title, news_content, news_status, create_by, create_time) VALUES
+ ('ch_news_01', '春晖青少年编程中心 2026 秋季学期顺利开课',
+  '<p>9 月 10 日，春晖青少年编程中心 2026 年秋季学期正式开课。本学期开设 Scratch 创意编程启蒙、Python 代码编程进阶、机器人搭建与竞赛等 6 门课程。</p><p>经营场所：武胜县沿口镇上东街257号（邮编638400）。</p>', 1, 'admin', '2026-09-10 09:00:00'),
+ ('ch_news_02', '我中心学员在广安市青少年编程展演活动中获得佳绩',
+  '<p>在广安市青少年编程展演活动中，我中心 Scratch 启蒙班与 Python 进阶班共 6 名学员晋级展示环节，其中 2 名学员获得一等奖。</p>', 1, 'teacher1', '2026-10-18 14:00:00'),
+ ('ch_news_03', 'Scratch 创意编程公益公开课圆满结束',
+  '<p>10 月下旬，中心举办公益公开课两场，共 30 组家庭参与，孩子们完成了自己的第一个动画作品。</p>', 1, 'teacher1', '2026-10-30 16:00:00'),
+ ('ch_news_04', '寒假 Python 专项班与 CSP-J 冲刺班报名开始',
+  '<p>寒假期间将开设 Python 数据可视化专项班与信息学奥赛 CSP-J 冲刺班，每班限额 8 人，报满即止。</p><p>地址：武胜县沿口镇上东街257号（邮编638400）。</p>', 1, 'teacher2', '2026-11-15 10:00:00');
+
+-- ============================================================
+-- 13. 作品文件登记（sys_file）+ 学员作品（teaching_work）+ 互评
+-- 注意：封面 PNG 与 .sb3 占位文件为 chseed 工具生成的二进制产物
+-- （写入 STORAGE_LOCAL_ROOT），纯 SQL 部署时数据行完整、静态预览 404。
+-- ============================================================
+DELETE FROM sys_file WHERE id LIKE 'ch_file_%' OR id LIKE 'ch_work_%_file';
+INSERT INTO sys_file (id, file_name, file_path, file_type, file_location, file_tag, sys_org_code, create_by, create_time, del_flag) VALUES
+ ('ch_file_cv01', 'cover.png', 'chunhui/covers/ch_file_cv01.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv02', 'cover.png', 'chunhui/covers/ch_file_cv02.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv03', 'cover.png', 'chunhui/covers/ch_file_cv03.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv04', 'cover.png', 'chunhui/covers/ch_file_cv04.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv05', 'cover.png', 'chunhui/covers/ch_file_cv05.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_file_cv06', 'cover.png', 'chunhui/covers/ch_file_cv06.png', 0, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_01_file', '我的第一个动画.sb3', 'chunhui/works/ch_work_01.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_02_file', '小猫追球.sb3', 'chunhui/works/ch_work_02.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_03_file', '会说话的角色.sb3', 'chunhui/works/ch_work_03.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_04_file', 'Hello Python.sb3', 'chunhui/works/ch_work_04.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_05_file', '猜数字游戏.sb3', 'chunhui/works/ch_work_05.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_06_file', 'Turtle 画星星.sb3', 'chunhui/works/ch_work_06.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_07_file', '循线机器人.sb3', 'chunhui/works/ch_work_07.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_08_file', 'LED 流水灯.sb3', 'chunhui/works/ch_work_08.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_09_file', '避障小车.sb3', 'chunhui/works/ch_work_09.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_10_file', '接苹果.sb3', 'chunhui/works/ch_work_10.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_11_file', '打地鼠.sb3', 'chunhui/works/ch_work_11.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0),
+ ('ch_work_12_file', '迷宫探险.sb3', 'chunhui/works/ch_work_12.sb3', 1, 1, 'chunhui', 'A01', 'admin', '2026-09-07 00:00:00', 0);
+
+DELETE FROM teaching_work;
+INSERT INTO teaching_work (id, create_by, create_time, sys_org_code, user_id, depart_id, course_id, work_name, work_type, work_file, work_cover, work_status, star_num, collect_num, view_num, work_scene, has_cloud_data, del_flag) VALUES
+ ('ch_work_01', 'ch_user_stu1', '2026-09-20 10:00:00', 'A01', 'ch_user_stu1', 'ch_depart_03', 'ch_course_01', '我的第一个动画：小猫说你好', 1, 'ch_work_01_file', 'ch_file_cv01', 4, 12, 4, 58, '{"v":1}', 0, 0),
+ ('ch_work_02', 'ch_user_stu2', '2026-09-20 10:00:00', 'A01', 'ch_user_stu2', 'ch_depart_03', 'ch_course_01', '小猫追球', 1, 'ch_work_02_file', 'ch_file_cv01', 4, 9, 3, 41, '{"v":1}', 0, 0),
+ ('ch_work_03', 'ch_user_stu1', '2026-09-20 10:00:00', 'A01', 'ch_user_stu1', 'ch_depart_03', 'ch_course_01', '会说话的角色', 1, 'ch_work_03_file', 'ch_file_cv01', 3, 3, 1, 17, '{"v":1}', 0, 0),
+ ('ch_work_04', 'ch_user_stu3', '2026-09-20 10:00:00', 'A01', 'ch_user_stu3', 'ch_depart_04', 'ch_course_02', 'Hello Python', 1, 'ch_work_04_file', 'ch_file_cv02', 4, 11, 3, 66, '{"v":1}', 0, 0),
+ ('ch_work_05', 'ch_user_stu4', '2026-09-20 10:00:00', 'A01', 'ch_user_stu4', 'ch_depart_04', 'ch_course_02', '猜数字游戏', 1, 'ch_work_05_file', 'ch_file_cv02', 4, 15, 5, 73, '{"v":1}', 0, 0),
+ ('ch_work_06', 'ch_user_stu3', '2026-09-20 10:00:00', 'A01', 'ch_user_stu3', 'ch_depart_04', 'ch_course_02', 'Turtle 画星星', 1, 'ch_work_06_file', 'ch_file_cv02', 3, 5, 1, 22, '{"v":1}', 0, 0),
+ ('ch_work_07', 'ch_user_stu5', '2026-09-20 10:00:00', 'A01', 'ch_user_stu5', 'ch_depart_05', 'ch_course_03', '循线机器人', 1, 'ch_work_07_file', 'ch_file_cv03', 4, 8, 2, 39, '{"v":1}', 0, 0),
+ ('ch_work_08', 'ch_user_stu6', '2026-09-20 10:00:00', 'A01', 'ch_user_stu6', 'ch_depart_05', 'ch_course_03', 'LED 流水灯', 1, 'ch_work_08_file', 'ch_file_cv03', 4, 6, 2, 28, '{"v":1}', 0, 0),
+ ('ch_work_09', 'ch_user_stu5', '2026-09-20 10:00:00', 'A01', 'ch_user_stu5', 'ch_depart_05', 'ch_course_03', '避障小车', 1, 'ch_work_09_file', 'ch_file_cv03', 3, 2, 0, 13, '{"v":1}', 0, 0),
+ ('ch_work_10', 'ch_user_stu1', '2026-09-20 10:00:00', 'A01', 'ch_user_stu1', 'ch_depart_03', 'ch_course_04', '接苹果', 1, 'ch_work_10_file', 'ch_file_cv04', 4, 13, 4, 61, '{"v":1}', 0, 0),
+ ('ch_work_11', 'ch_user_stu2', '2026-09-20 10:00:00', 'A01', 'ch_user_stu2', 'ch_depart_03', 'ch_course_04', '打地鼠', 1, 'ch_work_11_file', 'ch_file_cv04', 4, 10, 3, 47, '{"v":1}', 0, 0),
+ ('ch_work_12', 'ch_user_stu4', '2026-09-20 10:00:00', 'A01', 'ch_user_stu4', 'ch_depart_04', 'ch_course_04', '迷宫探险', 1, 'ch_work_12_file', 'ch_file_cv04', 4, 4, 1, 25, '{"v":1}', 0, 0);
+
+DELETE FROM teaching_work_comment;
+INSERT INTO teaching_work_comment (id, work_id, user_id, comment, create_by, create_time, sys_org_code) VALUES
+ ('ch_wc_01', 'ch_work_01', 'ch_user_stu2', '小猫的造型切换好流畅，我也要试试！', 'ch_user_stu2', '2026-09-21 09:00:00', 'A01'),
+ ('ch_wc_02', 'ch_work_01', 'ch_user_teacher1', '第一次就能完成完整动画，继续保持！', 'ch_user_teacher1', '2026-09-21 10:00:00', 'A01'),
+ ('ch_wc_03', 'ch_work_05', 'ch_user_stu3', '猜数字的循环写得真棒，用了二分吗？', 'ch_user_stu3', '2026-09-25 15:00:00', 'A01'),
+ ('ch_wc_04', 'ch_work_07', 'ch_user_stu6', '循线机器人转弯很稳，速度也快！', 'ch_user_stu6', '2026-09-28 11:00:00', 'A01'),
+ ('ch_wc_05', 'ch_work_10', 'ch_user_stu5', '苹果接住时有音效，细节满分。', 'ch_user_stu5', '2026-10-09 16:00:00', 'A01'),
+ ('ch_wc_06', 'ch_work_04', 'ch_user_teacher2', '代码缩进规范，注释也很清楚。', 'ch_user_teacher2', '2026-10-11 09:30:00', 'A01');

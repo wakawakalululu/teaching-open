@@ -88,19 +88,24 @@ func (s *Service) Static(r *ghttp.Request) {
 		return
 	}
 	defer func() { _ = f.Close() }()
-	r.Response.Header().Set("Content-Type", "application/octet-stream")
-	r.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%q", info.Name()))
+	// Content-Type 按扩展名映射：图片/视频内联渲染（门户封面 <img> 依赖），
+	// 其余保持 octet-stream 下载语义（V2.8 静态预览行为）。
+	ct := contentTypeByExt(filepath.Ext(absPath))
+	r.Response.Header().Set("Content-Type", ct)
+	if ct == "application/octet-stream" {
+		r.Response.Header().Set("Content-Disposition", fmt.Sprintf("attachment;filename=%q", info.Name()))
+	}
 	// Range 断点支持（V2.8 本地文件视频进度拖动依赖）
 	rangeHeader := r.Header.Get("Range")
 	if rangeHeader == "" {
 		r.Response.WriteHeader(200)
-		r.Response.Write(f)
+		writeFullFile(r, f)
 		return
 	}
 	start, end, ok := parseRange(rangeHeader, info.Size())
 	if !ok {
 		r.Response.WriteHeader(200)
-		r.Response.Write(f)
+		writeFullFile(r, f)
 		return
 	}
 	r.Response.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, info.Size()))
@@ -130,6 +135,52 @@ func (s *Service) Static(r *ghttp.Request) {
 }
 
 // parseRange 解析 Range: bytes=start-end（end 可省略）。
+// writeFullFile 将整个文件内容写入响应（必须读出字节，不可直接传 *os.File——
+// ghttp Response.Write 对非字节类型只写格式化表示，曾导致静态文件 2 字节）。
+func writeFullFile(r *ghttp.Request, f *os.File) {
+	if _, err := f.Seek(0, 0); err != nil {
+		return
+	}
+	buf := make([]byte, 32*1024)
+	for {
+		n, err := f.Read(buf)
+		if n > 0 {
+			if werr := writeChunk(r, buf[:n]); werr != nil {
+				return
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+// contentTypeByExt 扩展名 → Content-Type（覆盖门户/课程常见静态类型）。
+func contentTypeByExt(ext string) string {
+	switch strings.ToLower(ext) {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".svg":
+		return "image/svg+xml"
+	case ".webp":
+		return "image/webp"
+	case ".mp4":
+		return "video/mp4"
+	case ".mp3":
+		return "audio/mpeg"
+	case ".pdf":
+		return "application/pdf"
+	case ".zip":
+		return "application/zip"
+	default:
+		return "application/octet-stream"
+	}
+}
+
 func parseRange(header string, size int64) (int64, int64, bool) {
 	if !strings.HasPrefix(header, "bytes=") {
 		return 0, 0, false

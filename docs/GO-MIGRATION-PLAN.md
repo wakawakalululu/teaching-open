@@ -501,3 +501,54 @@ $ go test ./... -count=1    → 5 个包全部 ok，44 项测试通过
 - [ ] 配置 `JWT_SECRET`（≥32 字节随机值，不入库不入仓）
 - [ ] 压测登录接口：确认 bcrypt cost=12 下 P99 可接受（预期 200~300ms/次）
 - [ ] 演练令牌轮换：设置 `JWT_PREV_SECRET` 后确认旧 token 仍可用、新 token 正常签发
+
+---
+
+## 10. 下一阶段计划（2026-11-22 制定，基于架构审计与真机验证）
+
+### 10.1 架构现状快照（审计基准）
+
+| 项 | 值 | 备注 |
+| --- | --- | --- |
+| Go 工具链 | go1.27.4（go.mod 指令 1.26.0） | Linux 便携安装 ~/tools/go |
+| Web 框架 | GoFrame v2.10.4 | 约定见 .agents/skills/goframe-v2 |
+| 数据库 | MariaDB 11.8.9（teachingopen） | 69 表 V2.8 DDL + 春晖种子 |
+| Excel 引擎 | excelize v2.8.1 | 15 域规格 + importStudent |
+| 前端 | vue-antd-jeecg 2.2.0（Vue 2.7.16） | Node 20.19.4 生产构建通过 |
+| 注册路由 | ~325 条（internal/cmd/） | Java 484 方法级基线见 §7 |
+| 服务包 | internal/service/ 35 个域包 | dao/do/entity 23 套 |
+| 测试 | 21 个 _test.go | go vet/build/test 全绿 |
+
+### 10.2 真机端到端验证结论（Puppeteer + chrome-headless-shell）
+
+- 前端生产构建 → dist 静态服务 + /api 反代 → 登录页/门户/管理端 10 页全通（docs/screenshots/）。
+- 过程中发现并修复两类架构缺陷（见 commit 11ec19c）：
+  1. anon 路由挂载前缀错位（/api/sys 组吞掉教学域顶层路径 → 实际路径多 /sys）；
+  2. /api/sys 组内 5 条路由串重复携带 /sys 前缀（randomImage/checkCaptcha/phoneLogin/getEncryptedString/common/static）。
+- 种子数据补齐 sys_role_permission 管理员全菜单授权（138 条，QueryByUser 无 admin 旁路）。
+
+### 10.3 剩余工作清单（优先级序）
+
+1. **端点级覆盖精核**：以 484 方法级清单逐条 diff 当前 325 条注册路由，
+   输出「已迁移/合并实现/有意排除/待补」四态台账（本轮仅完成域级核对）。
+2. **Excel 列规格逐域精校**：excelx 15 域规格按 Java @Excel 注解逐列核对表头/
+   顺序/字典翻译（部分已核对，低风险）。
+3. **结构性排除确认（需产品决策）**：ThirdLogin 2（OAuth 凭据未配置）、
+   Quartz execute（Go 侧无调度器后端，QuartzSetStatus 已实现）、
+   ssoLogin（CAS 未部署）。
+4. **Redis 生产化**：REDIS_ENABLED=true 下复验验证码/登录限流/点赞幂等
+   （当前单机 memory 模式全通，Redis 故障已按放行降级，日志可见）。
+5. **静态资源 Content-Type**：upload.Static 当前统一 octet-stream +
+   attachment；按扩展名映射 image/png、video/mp4、application/zip，
+   以便门户封面直接内联渲染（<img> 已可用，直接访问体验待优化）。
+6. **前端构建产物入库策略**：dist 体积 ~22MB，暂不入库；补 deploy/build.sh
+   集成 Node 构建（或 CI 产物分发）。
+
+### 10.4 数据完备度（春晖真实数据）
+
+- 组织/用户/角色/授权：5 部门、10 用户、4 角色、138 条管理员授权。
+- 课程域：6 课程 + 22 单元 + 6 授权（含 CSP-J）。
+- 内容域：4 公告 + 13 阅读标记 + 4 资讯。
+- 作品域：12 作品（3 门课 × 学员）+ 6 封面 PNG（渐变实图）+ 12 .sb3 占位 + 6 互评。
+- 配置域：10 条（brandName/_address/_copyRight/_indexHtml/_homeHtml/_workShareHtml 等）。
+- 双路径：chseed（Go，含二进制生成）与 chunhui_seed.sql（纯 SQL，二进制除外）均已实测入库。
