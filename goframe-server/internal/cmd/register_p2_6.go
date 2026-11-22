@@ -52,6 +52,12 @@ var excelxBases = []string{
 	"/sys/user", "/teaching/teachingNews", "/teaching/teachingCourse",
 	"/teaching/teachingCourseUnit", "/teaching/teachingCourseDept",
 	"/teaching/teachingWork", "/teaching/teachingScratchAssets",
+	// 2026-11-22 补全：管理面板前端「导出/导入」按钮对应域
+	"/sys/dict", "/sys/dictItem", "/sys/category", "/sys/role",
+	"/sys/sysDepart", "/sys/sysDepartPermission", "/sys/sysDepartRole",
+	"/system/sysFile", "/sys/sysUserAgent",
+	"/message/sysMessage", "/message/sysMessageTemplate",
+	"/teaching/teachingDepartDayLog",
 }
 
 // wireP2_6Domains 装配 P2-6 泛型域路由、守卫与特殊端点。

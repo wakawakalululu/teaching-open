@@ -55,7 +55,8 @@ func main() {
 	// 1. 清除旧数据
 	for _, t := range []string{"sys_config", "sys_depart", "sys_user", "sys_user_role", "sys_user_depart",
 		"teaching_course", "teaching_course_unit", "teaching_course_dept", "sys_announcement", "sys_announcement_send",
-		"teaching_news", "sys_file", "teaching_work", "teaching_work_comment"} {
+		"teaching_news", "sys_file", "teaching_work", "teaching_work_comment",
+		"sys_position", "sys_data_source", "sys_sms_template", "sys_depart_role"} {
 		if _, err := g.DB().Exec(context.Background(), "DELETE FROM "+t); err != nil {
 			fmt.Printf("清除 %s 失败: %v\n", t, err)
 		}
@@ -76,8 +77,10 @@ func main() {
 	seedAnnouncementSends()
 	seedNews()
 	seedFiles()
+	seedMaps()
 	seedWorks()
 	seedWorkComments()
+	seedAdminBase()
 
 	fmt.Println("✓ 春晖青少年编程中心种子数据导入完成")
 }
@@ -284,27 +287,27 @@ func seedCourses() {
 		{"id": "ch_course_01", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Scratch 创意编程启蒙",
 			"course_desc": `<h2>Scratch 图形化编程启蒙课程</h2><p>适合 6-9 岁零基础学员。通过 MIT 开发的 Scratch 图形化编程工具，孩子可以像搭积木一样拖拽代码块，创作属于自己的互动故事、动画和小游戏。</p><h3>课程亮点</h3><ul><li>零门槛入门，无需打字基础</li><li>项目式学习，每节课完成一个作品</li><li>培养逻辑思维、创造力与问题解决能力</li><li>小班教学（8人/班），确保每个孩子得到关注</li></ul><h3>适合年龄</h3><p>6-9 岁（小学 1-3 年级）</p>`,
-			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 1, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
+			"show_type":   1, "course_map": mapThemeOf("ch_course_01").fileID, "is_shared": 0, "show_home": 1, "order_num": 1, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
 		{"id": "ch_course_02", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Python 代码编程进阶",
 			"course_desc": `<h2>Python 代码编程进阶课程</h2><p>适合 10-14 岁有一定编程基础的学员。从图形化编程过渡到真正的代码编程，学习 Python 语法、数据结构、算法与项目开发。</p><h3>课程亮点</h3><ul><li>从积木到代码的平滑过渡</li><li>涵盖 Turtle绘图、Pygame游戏开发、数据分析入门</li><li>培养算法思维与工程能力</li><li>完成多个实战项目</li></ul><h3>适合年龄</h3><p>10-14 岁（小学 4 年级 - 初中）</p>`,
-			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 2, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
+			"show_type":   1, "course_map": mapThemeOf("ch_course_02").fileID, "is_shared": 0, "show_home": 1, "order_num": 2, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
 		{"id": "ch_course_03", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "机器人搭建与竞赛",
 			"course_desc": `<h2>机器人搭建与竞赛课程</h2><p>适合 8-14 岁学员。学习机器人机械结构搭建、传感器应用与编程控制，备战各类机器人竞赛。</p><h3>课程亮点</h3><ul><li>硬件+软件结合，动手与动脑并行</li><li>竞赛导向训练，参与省市机器人竞赛</li><li>团队协作与项目管理能力培养</li></ul><h3>适合年龄</h3><p>8-14 岁（小学 2 年级 - 初中）</p>`,
-			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 3, "depart_ids": "ch_depart_05", "course_type": "2", "course_category": "1"},
+			"show_type":   1, "course_map": mapThemeOf("ch_course_03").fileID, "is_shared": 0, "show_home": 1, "order_num": 3, "depart_ids": "ch_depart_05", "course_type": "2", "course_category": "1"},
 		{"id": "ch_course_04", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Scratch 游戏设计专项",
 			"course_desc": `<h2>Scratch 游戏设计专项课程</h2><p>在掌握 Scratch 基础操作后，深入学习游戏设计原理：碰撞检测、计分系统、多关卡设计、音效与动画。学员将独立完成 3 个完整游戏作品。</p><h3>课程亮点</h3><ul><li>游戏化学习，激发兴趣</li><li>涵盖游戏设计核心概念</li><li>作品可在 Scratch 社区分享</li></ul><h3>适合年龄</h3><p>7-10 岁（已完成 Scratch 启蒙）</p>`,
-			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 4, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
+			"show_type":   1, "course_map": mapThemeOf("ch_course_04").fileID, "is_shared": 0, "show_home": 1, "order_num": 4, "depart_ids": "ch_depart_03", "course_type": "1", "course_category": "1"},
 		{"id": "ch_course_05", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "Python 数据可视化入门",
 			"course_desc": `<h2>Python 数据可视化入门课程</h2><p>学习使用 Matplotlib 和 Pandas 进行数据处理与可视化，制作漂亮的图表和报告。</p><h3>课程亮点</h3><ul><li>真实数据集分析（天气、运动、社交媒体）</li><li>培养数据思维与审美</li><li>为后续人工智能学习打基础</li></ul><h3>适合年龄</h3><p>11-14 岁（已掌握 Python 基础）</p>`,
-			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 1, "order_num": 5, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
+			"show_type":   1, "course_map": mapThemeOf("ch_course_05").fileID, "is_shared": 0, "show_home": 1, "order_num": 5, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
 		{"id": "ch_course_06", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
 			"course_name": "信息学奥赛 CSP-J 入门",
 			"course_desc": `<h2>信息学奥赛 CSP-J 入门课程</h2><p>面向准备参加 CSP-J（入门级）认证的学员，系统学习 C++ 语法、基础算法与数据结构。</p><h3>课程亮点</h3><ul><li>竞赛导向，系统训练</li><li>涵盖历年真题解析</li><li>一对一作业批改与竞赛策略指导</li></ul><h3>适合年龄</h3><p>12-14 岁（已具备 Python 基础，准备学习 C++）</p>`,
-			"show_type":   1, "course_map": 0, "is_shared": 0, "show_home": 0, "order_num": 6, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
+			"show_type":   1, "course_map": mapThemeOf("ch_course_06").fileID, "is_shared": 0, "show_home": 0, "order_num": 6, "depart_ids": "ch_depart_04", "course_type": "2", "course_category": "2"},
 	}
 	for _, c := range courses {
 		g.DB().Model("teaching_course").Data(c).Save()
@@ -312,103 +315,105 @@ func seedCourses() {
 	fmt.Println("课程 6 门已插入")
 }
 
-// seedUnits 课程单元（22 个，覆盖全部 6 门课程）。
+// seedUnits 课程单元（22 个，覆盖全部 6 门课程）：闯关式命名（第N关）+
+// 冒险路径坐标（map_x/map_y 对应 course_map 背景上的关卡节点），
+// 每门课最后一关为作品提交 Boss 关（course_work_type=1）。
 func seedUnits() {
 	units := []map[string]interface{}{
-		// Scratch 创意编程启蒙
+		// Scratch 创意编程启蒙（关卡路径：从初识王国出发，蛇形前往 Boss 关）
 		{"id": "ch_unit_01", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第1课 认识Scratch", "unit_intro": "了解Scratch界面布局，学会创建第一个动画项目：让小猫说“你好！”",
+			"unit_name": "第1关 初识Scratch", "unit_intro": "了解Scratch界面布局，创建第一个动画项目：让小猫说“你好！\"",
 			"course_id": "ch_course_01", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"media_content": "<p>本节课学习目标：熟悉Scratch编辑器界面，理解角色、舞台、脚本三个核心概念。</p>", "map_x": 0, "map_y": 0, "order_num": 1},
+			"media_content": "<p>关卡目标：熟悉Scratch编辑器界面，理解角色、舞台、脚本三个核心概念。</p>", "map_x": 100, "map_y": 150, "order_num": 1},
 		{"id": "ch_unit_02", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第2课 角色与运动", "unit_intro": "学习运动积木块，控制角色移动、旋转和弹性",
+			"unit_name": "第2关 角色与运动", "unit_intro": "学习运动积木块，控制角色移动、旋转和弹性",
 			"course_id": "ch_course_01", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"course_work_type": 1, "map_x": 100, "map_y": 200, "order_num": 2},
+			"map_x": 310, "map_y": 130, "order_num": 2},
 		{"id": "ch_unit_03", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第3课 外观与声音", "unit_intro": "给角色添加造型切换和音效，制作会说话的角色",
+			"unit_name": "第3关 外观与声音", "unit_intro": "给角色添加造型切换和音效，制作会说话的角色",
 			"course_id": "ch_course_01", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 3},
+			"map_x": 520, "map_y": 160, "order_num": 3},
 		{"id": "ch_unit_04", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第4课 事件与控制", "unit_intro": "学习事件触发和条件判断，制作互动故事",
+			"unit_name": "第4关 事件与控制", "unit_intro": "学习事件触发和条件判断，制作互动故事",
 			"course_id": "ch_course_01", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"course_work_type": 1, "map_x": 200, "map_y": 200, "order_num": 4},
+			"map_x": 730, "map_y": 230, "order_num": 4},
 		{"id": "ch_unit_05", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第5课 循环与变量", "unit_intro": "使用重复执行和变量，制作计分器和倒计时",
+			"unit_name": "第5关 循环与变量【Boss】", "unit_intro": "关卡挑战：运用重复执行和变量制作计分器作品，提交作品即通关！",
 			"course_id": "ch_course_01", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 5},
+			"course_work_type": 1, "map_x": 560, "map_y": 390, "order_num": 5},
 		// Python 代码编程进阶
 		{"id": "ch_unit_10", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第1课 Hello Python", "unit_intro": "安装Python环境，编写第一个print程序",
+			"unit_name": "第1关 Hello Python", "unit_intro": "安装Python环境，编写第一个print程序",
 			"course_id": "ch_course_02", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 1},
+			"map_x": 800, "map_y": 150, "order_num": 1},
 		{"id": "ch_unit_11", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第2课 变量与数据类型", "unit_intro": "学习变量、整数、浮点数、字符串和布尔值",
+			"unit_name": "第2关 变量与类型", "unit_intro": "学习变量、整数、浮点数、字符串和布尔值",
 			"course_id": "ch_course_02", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 2},
+			"map_x": 590, "map_y": 130, "order_num": 2},
 		{"id": "ch_unit_12", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第3课 条件判断", "unit_intro": "学习if-else语句，编写猜数字游戏",
+			"unit_name": "第3关 条件判断", "unit_intro": "学习if-else语句，编写猜数字小游戏",
 			"course_id": "ch_course_02", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"course_work_type": 1, "map_x": 200, "map_y": 200, "order_num": 3},
+			"map_x": 380, "map_y": 160, "order_num": 3},
 		{"id": "ch_unit_13", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第4课 循环结构", "unit_intro": "学习for和while循环，绘制Turtle图形",
+			"unit_name": "第4关 循环结构", "unit_intro": "学习for和while循环，绘制Turtle图形",
 			"course_id": "ch_course_02", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 4},
+			"map_x": 170, "map_y": 230, "order_num": 4},
 		{"id": "ch_unit_14", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第5课 列表与字典", "unit_intro": "学习Python数据结构，制作通讯录管理程序",
+			"unit_name": "第5关 列表与字典【Boss】", "unit_intro": "关卡挑战：用列表与字典完成通讯录程序，提交作品即通关！",
 			"course_id": "ch_course_02", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 5},
+			"course_work_type": 1, "map_x": 340, "map_y": 390, "order_num": 5},
 		// 机器人搭建与竞赛
 		{"id": "ch_unit_20", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第1课 认识机器人", "unit_intro": "了解机器人组成结构，认识主控板和传感器",
+			"unit_name": "第1关 认识机器人", "unit_intro": "了解机器人组成结构，认识主控板和传感器",
 			"course_id": "ch_course_03", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 1},
+			"map_x": 110, "map_y": 160, "order_num": 1},
 		{"id": "ch_unit_21", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第2课 LED与蜂鸣器", "unit_intro": "学习点亮LED和驱动蜂鸣器发声",
+			"unit_name": "第2关 LED与蜂鸣器", "unit_intro": "学习点亮LED和驱动蜂鸣器发声",
 			"course_id": "ch_course_03", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 2},
+			"map_x": 340, "map_y": 130, "order_num": 2},
 		{"id": "ch_unit_22", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第3课 电机与轮子", "unit_intro": "学习驱动电机，让机器人动起来",
+			"unit_name": "第3关 电机与轮子", "unit_intro": "学习驱动电机，让机器人动起来",
 			"course_id": "ch_course_03", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"course_work_type": 1, "map_x": 0, "map_y": 0, "order_num": 3},
+			"map_x": 570, "map_y": 170, "order_num": 3},
 		{"id": "ch_unit_23", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第4课 循线行走", "unit_intro": "学习红外传感器，让机器人沿黑线行走",
+			"unit_name": "第4关 循线行走【Boss】", "unit_intro": "关卡挑战：调试红外传感器完成循线赛道，提交走通全程的作品视频即通关！",
 			"course_id": "ch_course_03", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 4},
+			"course_work_type": 1, "map_x": 790, "map_y": 300, "order_num": 4},
 		// Scratch 游戏设计专项
 		{"id": "ch_unit_30", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第1课 接苹果游戏", "unit_intro": "学习碰撞检测，制作经典接苹果游戏",
+			"unit_name": "第1关 接苹果", "unit_intro": "学习碰撞检测，制作经典接苹果游戏",
 			"course_id": "ch_course_04", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 1},
+			"map_x": 110, "map_y": 150, "order_num": 1},
 		{"id": "ch_unit_31", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第2课 打地鼠游戏", "unit_intro": "学习随机出现和计分系统，制作打地鼠",
+			"unit_name": "第2关 打地鼠", "unit_intro": "学习随机出现和计分系统，制作打地鼠",
 			"course_id": "ch_course_04", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 2},
+			"map_x": 340, "map_y": 130, "order_num": 2},
 		{"id": "ch_unit_32", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第3课 迷宫探险", "unit_intro": "学习方向键控制和墙壁碰撞，制作迷宫游戏",
+			"unit_name": "第3关 迷宫探险", "unit_intro": "学习方向键控制和墙壁碰撞，制作迷宫游戏",
 			"course_id": "ch_course_04", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 3},
+			"map_x": 570, "map_y": 160, "order_num": 3},
 		{"id": "ch_unit_33", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第4课 多关卡设计", "unit_intro": "学习关卡切换和难度递增，制作多关卡游戏",
+			"unit_name": "第4关 多关卡设计【Boss】", "unit_intro": "关卡挑战：设计一款含 3 个关卡的完整游戏并提交，即通关毕业！",
 			"course_id": "ch_course_04", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 4},
+			"course_work_type": 1, "map_x": 790, "map_y": 280, "order_num": 4},
 		// Python 数据可视化入门
 		{"id": "ch_unit_40", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第1课 初识Matplotlib", "unit_intro": "安装Matplotlib，绘制第一条折线图",
+			"unit_name": "第1关 初识Matplotlib", "unit_intro": "安装Matplotlib，绘制第一条折线图",
 			"course_id": "ch_course_05", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 1},
+			"map_x": 160, "map_y": 160, "order_num": 1},
 		{"id": "ch_unit_41", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第2课 柱状图与饼图", "unit_intro": "学习柱状图、饼图和散点图的绘制",
+			"unit_name": "第2关 柱状图与饼图【Boss】", "unit_intro": "关卡挑战：用真实数据集绘制一张柱状图与一张饼图，提交即通关！",
 			"course_id": "ch_course_05", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 2},
+			"course_work_type": 1, "map_x": 460, "map_y": 130, "order_num": 2},
 		// 信息学奥赛 CSP-J 入门
 		{"id": "ch_unit_60", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第1课 C++ 起步", "unit_intro": "搭建 C++ 编译环境，理解程序编译运行流程",
+			"unit_name": "第1关 C++ 起步", "unit_intro": "搭建 C++ 编译环境，理解程序编译运行流程",
 			"course_id": "ch_course_06", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 1},
+			"map_x": 740, "map_y": 160, "order_num": 1},
 		{"id": "ch_unit_61", "create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01", "del_flag": 0,
-			"unit_name": "第2课 顺序与分支", "unit_intro": "C++ 基本语句、if 分支与 CSP-J 真题入门",
+			"unit_name": "第2关 顺序与分支【Boss】", "unit_intro": "关卡挑战：完成一套 CSP-J 入门真题的顺序与分支题目，提交即通关！",
 			"course_id": "ch_course_06", "course_video_source": 1, "show_course_video": 1, "show_course_case": 1, "show_course_ppt": 0, "show_course_plan": 0,
-			"map_x": 0, "map_y": 0, "order_num": 2},
+			"course_work_type": 1, "map_x": 440, "map_y": 130, "order_num": 2},
 	}
 	for _, u := range units {
 		g.DB().Model("teaching_course_unit").Data(u).Save()
@@ -683,4 +688,227 @@ func seedWorkComments() {
 		g.DB().Model("teaching_work_comment").Data(c).Save()
 	}
 	fmt.Println("作品评论 6 条已插入")
+}
+
+// mapNode 关卡节点坐标（900x1000 地图画布上的像素位）。
+type mapNode struct{ x, y int }
+
+// mapTheme 课程闯关地图主题：背景图配色 + 关卡路径。
+// 节点顺序即通关顺序（与单元 order_num 对应）。
+type mapTheme struct {
+	courseID string
+	fileID   string
+	road     [3]uint8 // 路径色（与课程封面渐变同族）
+	skyTop   [3]uint8
+	skyBot   [3]uint8
+	nodes    []mapNode
+}
+
+// mapThemes 六门课程的闯关路径（蛇形冒险路线，越往后越高/越靠近 Boss 关）。
+var mapThemes = []mapTheme{
+	{"ch_course_01", "ch_file_map01", [3]uint8{118, 75, 162}, [3]uint8{228, 238, 255}, [3]uint8{185, 190, 240},
+		[]mapNode{{100, 150}, {310, 130}, {520, 160}, {730, 230}, {560, 390}}},
+	{"ch_course_02", "ch_file_map02", [3]uint8{245, 87, 108}, [3]uint8{255, 236, 244}, [3]uint8{250, 205, 220},
+		[]mapNode{{800, 150}, {590, 130}, {380, 160}, {170, 230}, {340, 390}}},
+	{"ch_course_03", "ch_file_map03", [3]uint8{0, 150, 200}, [3]uint8{224, 246, 255}, [3]uint8{180, 225, 245},
+		[]mapNode{{110, 160}, {340, 130}, {570, 170}, {790, 300}}},
+	{"ch_course_04", "ch_file_map04", [3]uint8{240, 120, 60}, [3]uint8{255, 244, 224}, [3]uint8{250, 216, 180},
+		[]mapNode{{110, 150}, {340, 130}, {570, 160}, {790, 280}}},
+	{"ch_course_05", "ch_file_map05", [3]uint8{35, 166, 138}, [3]uint8{224, 250, 240}, [3]uint8{180, 235, 215},
+		[]mapNode{{160, 160}, {460, 130}}},
+	{"ch_course_06", "ch_file_map06", [3]uint8{90, 100, 130}, [3]uint8{235, 238, 248}, [3]uint8{195, 200, 220},
+		[]mapNode{{740, 160}, {440, 130}}},
+}
+
+// mapThemeOf 课程 id → 地图主题。
+func mapThemeOf(courseID string) mapTheme {
+	for i := range mapThemes {
+		if mapThemes[i].courseID == courseID {
+			return mapThemes[i]
+		}
+	}
+	return mapTheme{}
+}
+
+// seedMaps 生成 6 张闯关式课程地图背景（天空渐变 + 云朵 + 蛇形冒险路径 +
+// 关卡节点圆台 + 出发/终局标记），登记 sys_file 并供 course_map 引用。
+func seedMaps() {
+	root := os.Getenv("STORAGE_LOCAL_ROOT")
+	if root == "" {
+		root = "/tmp/chunhui_upload"
+	}
+	n := 0
+	for i := range mapThemes {
+		t := &mapThemes[i]
+		path := fmt.Sprintf("chunhui/maps/%s.png", t.courseID)
+		if err := drawAdventureMap(filepath.Join(root, filepath.FromSlash(path)), t); err != nil {
+			fmt.Printf("生成地图 %s 失败: %v\n", path, err)
+			continue
+		}
+		saveFile(t.fileID, "course-map.png", path, 0)
+		n++
+	}
+	fmt.Printf("闯关地图背景 %d 张已生成并登记 sys_file\n", n)
+}
+
+// drawAdventureMap 绘制单张闯关地图（900x1000）。
+func drawAdventureMap(abs string, t *mapTheme) error {
+	const w, h = 900, 1000
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		return err
+	}
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	// 天空渐变（int 域插值防 uint8 下溢）
+	for y := 0; y < h; y++ {
+		tt := float64(y) / float64(h-1)
+		r := uint8(int(float64(t.skyTop[0]) + (float64(t.skyBot[0])-float64(t.skyTop[0]))*tt))
+		gg := uint8(int(float64(t.skyTop[1]) + (float64(t.skyBot[1])-float64(t.skyTop[1]))*tt))
+		b := uint8(int(float64(t.skyTop[2]) + (float64(t.skyBot[2])-float64(t.skyTop[2]))*tt))
+		for x := 0; x < w; x++ {
+			img.Set(x, y, color.RGBA{r, gg, b, 255})
+		}
+	}
+	// 装饰云朵（不透明浅白，圆簇）
+	cloud := color.RGBA{252, 253, 255, 255}
+	for _, c := range [][2]int{{160, 90}, {640, 70}, {430, 210}} {
+		fillCircle(img, c[0], c[1], 34, cloud)
+		fillCircle(img, c[0]-36, c[1]+8, 24, cloud)
+		fillCircle(img, c[0]+38, c[1]+10, 26, cloud)
+	}
+	// 蛇形路径：相邻节点连线，圆头粗路 + 浅色中线
+	roadC := color.RGBA{t.road[0], t.road[1], t.road[2], 255}
+	midC := color.RGBA{uint8(t.road[0] + 60), uint8(t.road[1] + 60), uint8(t.road[2] + 60), 255}
+	if midC.R < t.road[0] {
+		midC = roadC
+	}
+	for i := 0; i < len(t.nodes)-1; i++ {
+		drawThickLine(img, t.nodes[i], t.nodes[i+1], 13, roadC)
+		drawDashedLine(img, t.nodes[i], t.nodes[i+1], 3, midC)
+	}
+	// 关卡节点圆台：起点绿环、终点金色 Boss 环、中间浅色平台
+	for i, nd := range t.nodes {
+		var ring [3]uint8
+		switch i {
+		case 0:
+			ring = [3]uint8{70, 180, 90}
+		case len(t.nodes) - 1:
+			ring = [3]uint8{230, 170, 40}
+		default:
+			ring = [3]uint8{t.road[0] + 30, t.road[1] + 30, t.road[2] + 30}
+		}
+		fillCircle(img, nd.x, nd.y, 36, color.RGBA{ring[0], ring[1], ring[2], 255})
+		fillCircle(img, nd.x, nd.y, 30, color.RGBA{252, 252, 252, 255})
+	}
+	f, err := os.Create(abs)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	return png.Encode(f, img)
+}
+
+// fillCircle 圆填充（欧氏距离判定）。
+func fillCircle(img *image.RGBA, cx, cy, r int, c color.RGBA) {
+	for y := cy - r; y <= cy+r; y++ {
+		for x := cx - r; x <= cx+r; x++ {
+			if x < img.Bounds().Min.X || x >= img.Bounds().Max.X ||
+				y < img.Bounds().Min.Y || y >= img.Bounds().Max.Y {
+				continue
+			}
+			dx, dy := x-cx, y-cy
+			if dx*dx+dy*dy <= r*r {
+				img.Set(x, y, c)
+			}
+		}
+	}
+}
+
+// drawThickLine 圆头粗线：沿段步进盖圆。
+func drawThickLine(img *image.RGBA, a, b mapNode, r int, c color.RGBA) {
+	steps := max(1, abs(b.x-a.x)+abs(b.y-a.y))
+	for s := 0; s <= steps; s++ {
+		tt := float64(s) / float64(steps)
+		x := a.x + int(float64(b.x-a.x)*tt)
+		y := a.y + int(float64(b.y-a.y)*tt)
+		fillCircle(img, x, y, r, c)
+	}
+}
+
+// drawDashedLine 虚线中线：每隔一段画一个短点。
+func drawDashedLine(img *image.RGBA, a, b mapNode, r int, c color.RGBA) {
+	steps := max(1, abs(b.x-a.x)+abs(b.y-a.y))
+	for s := 0; s <= steps; s += 22 {
+		tt := float64(s) / float64(steps)
+		x := a.x + int(float64(b.x-a.x)*tt)
+		y := a.y + int(float64(b.y-a.y)*tt)
+		fillCircle(img, x, y, r, c)
+	}
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// seedAdminBase 管理后台基础数据（position/数据源/消息模板/部门角色）。
+// 这些表在 V2.8 演示库中有数据，全量替换 Mock 后被清空 → 管理页显示「暂无数据」。
+func seedAdminBase() {
+	positions := []map[string]interface{}{
+		{"id": "ch_pos_01", "code": "principal", "name": "校长", "post_rank": "1", "company_id": "ch_depart_01", "sys_org_code": "A01", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_pos_02", "code": "teacher", "name": "讲师", "post_rank": "2", "company_id": "ch_depart_01", "sys_org_code": "A01", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_pos_03", "code": "coach", "name": "竞赛教练", "post_rank": "2", "company_id": "ch_depart_01", "sys_org_code": "A01", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_pos_04", "code": "assistant", "name": "助教", "post_rank": "3", "company_id": "ch_depart_01", "sys_org_code": "A01", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_pos_05", "code": "affairs", "name": "教务", "post_rank": "3", "company_id": "ch_depart_02", "sys_org_code": "A01", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+	}
+	for _, p := range positions {
+		g.DB().Model("sys_position").Data(p).Save()
+	}
+
+	// 主数据源（指向本库，供「多数据源管理」页展示与在线表单引用）
+	g.DB().Model("sys_data_source").Data(map[string]interface{}{
+		"id": "ch_ds_master", "code": "master", "name": "春晖教学平台主库",
+		"remark":  "本系统默认数据源（teachingopen）",
+		"db_type": "mysql", "db_driver": "com.mysql.cj.jdbc.Driver",
+		"db_url":  "jdbc:mysql://127.0.0.1:13306/teachingopen?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai",
+		"db_name": "teachingopen", "db_username": "teaching", "db_password": "",
+		"create_by": "admin", "create_time": "2026-09-07 00:00:00", "sys_org_code": "A01",
+	}).Save()
+
+	tpls := []map[string]interface{}{
+		{"id": "ch_tpl_01", "template_name": "账号注册验证码", "template_code": "SMS_VERIFY_CODE",
+			"template_type": "1", "template_content": "您的验证码为 ${code}，10 分钟内有效。",
+			"template_test_json": `{"code":"123456"}`, "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_tpl_02", "template_name": "作业布置通知", "template_code": "WORK_ASSIGN_NOTICE",
+			"template_type": "2", "template_content": "【春晖编程】老师布置了新作业：${workName}，请在 ${deadline} 前提交。",
+			"template_test_json": `{"workName":"第2关 角色与运动","deadline":"本周六"}`, "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_tpl_03", "template_name": "作品被点赞通知", "template_code": "WORK_LIKE_NOTICE",
+			"template_type": "2", "template_content": "【春晖编程】你的作品《${workName}》获得了新的点赞，当前 ${starNum} 赞！",
+			"template_test_json": `{"workName":"接苹果","starNum":"13"}`, "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+	}
+	for _, t := range tpls {
+		g.DB().Model("sys_sms_template").Data(t).Save()
+	}
+
+	// 部门角色（班级管理员角色，供通讯录/部门角色页展示）
+	roles := []map[string]interface{}{
+		{"id": "ch_dr_01", "depart_id": "ch_depart_03", "role_name": "Scratch班管理员", "role_code": "scratch_admin",
+			"description": "Scratch启蒙班班级管理", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_dr_02", "depart_id": "ch_depart_04", "role_name": "Python班管理员", "role_code": "python_admin",
+			"description": "Python进阶班班级管理", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+		{"id": "ch_dr_03", "depart_id": "ch_depart_05", "role_name": "机器人班管理员", "role_code": "robot_admin",
+			"description": "机器人竞赛班班级管理", "create_by": "admin", "create_time": "2026-09-07 00:00:00"},
+	}
+	for _, r := range roles {
+		g.DB().Model("sys_depart_role").Data(r).Save()
+	}
+	fmt.Println("管理基础数据：职务 5 / 数据源 1 / 消息模板 3 / 部门角色 3 已插入")
 }

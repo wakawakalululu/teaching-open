@@ -140,6 +140,19 @@ func (c *Controller) TreeList(r *ghttp.Request) {
 	ok(r, res)
 }
 
+// LoadTreeData 通用表树加载（契约：GET /sys/dict/loadTreeData）。
+func (c *Controller) LoadTreeData(r *ghttp.Request) {
+	res, err := c.svc.LoadTreeData(r.Context(),
+		r.Get("pid").String(), r.Get("pidField").String(), r.Get("tableName").String(),
+		r.Get("text").String(), r.Get("code").String(), r.Get("hasChildField").String(),
+		r.Get("condition").String())
+	if err != nil {
+		c.writeError(r, err)
+		return
+	}
+	ok(r, res)
+}
+
 // GetByCode 按字典编码查询。
 func (c *Controller) GetByCode(r *ghttp.Request) {
 	res, err := c.svc.GetByCode(r.Context(), r.Get("dicCode").String())

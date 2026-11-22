@@ -156,6 +156,19 @@ func specTable(base string) string {
 		"/teaching/teachingCourseDept":    "teaching_course_dept",
 		"/teaching/teachingWork":          "teaching_work",
 		"/teaching/teachingScratchAssets": "teaching_scratch_assets",
+		// 2026-11-22 Excel 补全域
+		"/sys/dict":                      "sys_dict",
+		"/sys/dictItem":                  "sys_dict_item",
+		"/sys/category":                  "sys_category",
+		"/sys/role":                      "sys_role",
+		"/sys/sysDepart":                 "sys_depart",
+		"/sys/sysDepartPermission":       "sys_depart_permission",
+		"/sys/sysDepartRole":             "sys_depart_role",
+		"/system/sysFile":                "sys_file",
+		"/sys/sysUserAgent":              "sys_user_agent",
+		"/message/sysMessage":            "sys_sms",
+		"/message/sysMessageTemplate":    "sys_sms_template",
+		"/teaching/teachingDepartDayLog": "teaching_depart_day_log",
 	}
 	return m[base]
 }
@@ -163,10 +176,9 @@ func specTable(base string) string {
 // delFlagCol 含 del_flag 列的表返回列名（导出过滤已删行），否则空。
 func delFlagCol(base string) string {
 	switch base {
-	case "/sys/annountCement", "/sys/user", "/sys/quartzJob":
+	case "/sys/annountCement", "/sys/user", "/sys/quartzJob",
+		"/sys/dict", "/sys/sysDepart", "/system/sysFile":
 		return "del_flag"
-	case "/teaching/teachingNews":
-		return ""
 	}
 	return ""
 }

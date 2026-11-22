@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
+	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/os/gtime"
 	"github.com/gogf/gf/v2/util/gconv"
 	"github.com/gogf/gf/v2/util/guid"
@@ -548,4 +549,83 @@ func applyStarFilter(m *gdb.Model, col, value string) *gdb.Model {
 		return m.WhereLike(col, strings.ReplaceAll(value, "*", "%"))
 	}
 	return m.Where(col, value)
+}
+
+// TreeSelectModel 通用树形下拉节点（对应 Java TreeSelectModel）。
+type TreeSelectModel struct {
+	Key      string `json:"key"`
+	Title    string `json:"title"`
+	IsLeaf   bool   `json:"isLeaf"`
+	ParentId string `json:"parentId,omitempty"`
+	Value    string `json:"value,omitempty"`
+	Code     string `json:"code,omitempty"`
+}
+
+// treeTableWhitelist 通用树查询允许的表（Java 版是任意 tableName 拼接，
+// 存在注入面；Go 侧收紧为显式白名单，其余表名直接拒绝）。
+var treeTableWhitelist = map[string]struct{}{
+	"sys_category":   {},
+	"sys_dict":       {},
+	"sys_depart":     {},
+	"sys_permission": {},
+	"sys_role":       {},
+}
+
+// LoadTreeData 通用表树加载（契约蓝本 SysDictController#loadTreeData）。
+//
+// 参数与 Java 一致：pid/pidField/tableName/text/code/hasChildField/condition。
+// 表名必须命中白名单，pidField/text/code/hasChildField 必须通过标识符校验；
+// condition 为 JSON 对象，其键同样校验后以占位符绑定值。
+func (s *Service) LoadTreeData(ctx context.Context, pid, pidField, table, text, code, hasChildField, condition string) ([]TreeSelectModel, error) {
+	if _, ok := treeTableWhitelist[table]; !ok {
+		return nil, ErrDictCodeInvalid
+	}
+	for _, ident := range []string{pidField, text, code, hasChildField} {
+		if ident != "" && !ValidIdent(ident) {
+			return nil, ErrDictCodeInvalid
+		}
+	}
+	if pidField == "" {
+		pidField = "pid"
+	}
+	if text == "" || code == "" {
+		return nil, ErrDictCodeInvalid
+	}
+	// isLeaf：有 hasChildField 时按其值取反；无则视作叶子（与 Java 默认一致）。
+	leafExpr := "1"
+	if hasChildField != "" {
+		leafExpr = fmt.Sprintf("(CASE WHEN %s = '1' THEN 0 ELSE 1 END)", hasChildField)
+	}
+	query := fmt.Sprintf(
+		"SELECT %s AS `key`, %s AS `title`, %s AS `parentId`, %s AS `code`, %s AS isLeaf FROM %s WHERE %s = ?",
+		code, text, pidField, code, leafExpr, table, pidField)
+	args := []interface{}{pid}
+
+	if condition != "" {
+		cond := map[string]string{}
+		if err := jsonUnmarshalHelper(condition, &cond); err != nil {
+			return nil, ErrTableDictFilterUnsupported
+		}
+		for k, v := range cond {
+			if !ValidIdent(k) {
+				return nil, ErrDictCodeInvalid
+			}
+			query += " AND " + k + " = ?"
+			args = append(args, v)
+		}
+	}
+	records, err := dao.SysDict.DB().GetAll(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("查询树数据失败: %w", err)
+	}
+	var list []TreeSelectModel
+	if err := records.Structs(&list); err != nil {
+		return nil, fmt.Errorf("解析树数据失败: %w", err)
+	}
+	return list, nil
+}
+
+// jsonUnmarshalHelper JSON 反序列化（避免新增依赖导入位置分散）。
+func jsonUnmarshalHelper(data string, v interface{}) error {
+	return gjson.Unmarshal([]byte(data), v)
 }

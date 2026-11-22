@@ -389,6 +389,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/sys/permission/add", permissionCtrl.MenuAdd)
 		group.PUT("/sys/permission/edit", permissionCtrl.MenuEdit)
 		group.POST("/sys/permission/edit", permissionCtrl.MenuEdit)
+		// Java 契约为 GET（SysPermissionController#edit）——补方法别名，防 405/404
+		group.GET("/sys/permission/edit", permissionCtrl.MenuEdit)
 		group.DELETE("/sys/permission/delete", permissionCtrl.MenuDelete)
 		group.DELETE("/sys/permission/deleteBatch", permissionCtrl.MenuDeleteBatch)
 		group.GET("/sys/permission/queryTreeList", permissionCtrl.PermissionTreeList)
@@ -399,6 +401,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/sys/permission/addPermissionRule", permissionCtrl.AddPermissionRule)
 		group.PUT("/sys/permission/editPermissionRule", permissionCtrl.EditPermissionRule)
 		group.POST("/sys/permission/editPermissionRule", permissionCtrl.EditPermissionRule)
+		// Java 契约为 GET（SysPermissionController#editPermissionRule）
+		group.GET("/sys/permission/editPermissionRule", permissionCtrl.EditPermissionRule)
 		group.DELETE("/sys/permission/deletePermissionRule", permissionCtrl.DeletePermissionRule)
 		group.GET("/sys/permission/queryPermissionRule", permissionCtrl.QueryPermissionRule)
 		group.GET("/sys/permission/queryDepartPermission", permissionCtrl.QueryDepartPermission)
@@ -503,6 +507,8 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 		group.POST("/teaching/menu/add", teachingMenuCtrl.Add)
 		group.PUT("/teaching/menu/edit", teachingMenuCtrl.Edit)
 		group.POST("/teaching/menu/edit", teachingMenuCtrl.Edit)
+		// Java 契约为 GET（TeachingMenuController#edit）
+		group.GET("/teaching/menu/edit", teachingMenuCtrl.Edit)
 		group.DELETE("/teaching/menu/delete", teachingMenuCtrl.Delete)
 		group.DELETE("/teaching/menu/deleteBatch", teachingMenuCtrl.DeleteBatch)
 		group.GET("/teaching/menu/queryTreeList", teachingMenuCtrl.QueryTreeList)
@@ -630,6 +636,9 @@ func mainFunc(ctx context.Context, parser *gcmd.Parser) (err error) {
 
 		// P2-8 收尾域：SysUserAgent（syscrud）+ ng-alain（Angular 辅助）
 		wireUserAgentAndNgAlain(group, registerGuard, svcPermission.New())
+
+		// 契约补齐：方法别名 + 遗漏端点（Java 411 方法级对账后逐条对齐）
+		wireContractGaps(group, registerGuard, dictCtrl, loginCtrl, teachingUserCtrl, uploadCtrl)
 
 		// Excel 能力：全域 exportXls/importExcel + importStudent（excelize 引擎）
 		for _, exBase := range excelxBases {

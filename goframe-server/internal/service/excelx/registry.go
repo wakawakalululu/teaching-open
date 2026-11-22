@@ -120,4 +120,73 @@ var specs = []Spec{
 		{Field: "asset_type", Header: "素材类型"}, {Field: "asset_name", Header: "素材名称"},
 		{Field: "md5_ext", Header: "md5扩展名"}, {Field: "tags", Header: "标签"},
 	}},
+	// ---- 2026-11-22 补全：管理面板缺失的 Excel 域（前端「导出/导入」按钮 404）----
+	{Base: "/sys/dict", Title: "数据字典列表", Cols: []ExcelCol{
+		{Field: "dict_name", Header: "字典名称"}, {Field: "dict_code", Header: "字典编码"},
+		{Field: "description", Header: "描述"}, {Field: "type", Header: "字典类型"},
+		{Field: "create_by", Header: "创建人"}, {Field: "create_time", Header: "创建时间"},
+		{Field: "update_by", Header: "更新人"}, {Field: "update_time", Header: "更新时间"},
+	}},
+	{Base: "/sys/dictItem", Title: "字典项列表", Cols: []ExcelCol{
+		{Field: "item_text", Header: "字典项文本"}, {Field: "item_value", Header: "字典项值"},
+		{Field: "description", Header: "描述"}, {Field: "sort_order", Header: "排序"},
+		{Field: "status", Header: "状态", Dic: "dict_item_status"},
+	}},
+	{Base: "/sys/category", Title: "分类字典列表", Cols: []ExcelCol{
+		{Field: "name", Header: "分类名称"}, {Field: "code", Header: "分类编码"},
+		{Field: "pid", Header: "父级节点"}, {Field: "has_child", Header: "是否有子节点"},
+		{Field: "comment", Header: "描述"}, {Field: "create_by", Header: "创建人"},
+		{Field: "create_time", Header: "创建时间"},
+	}},
+	{Base: "/sys/role", Title: "角色列表", Cols: []ExcelCol{
+		{Field: "role_name", Header: "角色名称"}, {Field: "role_code", Header: "角色编码"},
+		{Field: "description", Header: "描述"}, {Field: "role_level", Header: "角色等级"},
+		{Field: "create_by", Header: "创建人"}, {Field: "create_time", Header: "创建时间"},
+	}},
+	{Base: "/sys/sysDepart", Title: "部门列表", Cols: []ExcelCol{
+		{Field: "depart_name", Header: "机构名称"}, {Field: "depart_name_en", Header: "机构英文名称"},
+		{Field: "depart_name_abbr", Header: "机构简称"}, {Field: "org_code", Header: "机构编码"},
+		{Field: "parent_id", Header: "父机构ID"}, {Field: "depart_order", Header: "排序"},
+		{Field: "mobile", Header: "手机号"}, {Field: "fax", Header: "传真"},
+		{Field: "address", Header: "地址"}, {Field: "memo", Header: "备注"},
+		{Field: "status", Header: "状态", Dic: "depart_status"},
+	}},
+	{Base: "/sys/sysDepartPermission", Title: "部门权限列表", Cols: []ExcelCol{
+		{Field: "depart_id", Header: "部门id"}, {Field: "permission_id", Header: "权限id"},
+		{Field: "data_rule_ids", Header: "数据规则id"},
+	}},
+	{Base: "/sys/sysDepartRole", Title: "部门角色列表", Cols: []ExcelCol{
+		{Field: "depart_id", Header: "部门id"}, {Field: "role_name", Header: "角色名称"},
+		{Field: "role_code", Header: "角色编码"}, {Field: "description", Header: "描述"},
+	}},
+	{Base: "/system/sysFile", Title: "文件列表", Cols: []ExcelCol{
+		{Field: "file_name", Header: "文件名称"}, {Field: "file_path", Header: "文件地址"},
+		{Field: "file_type", Header: "文件类型"}, {Field: "file_location", Header: "存储位置"},
+		{Field: "file_tag", Header: "文件标识"}, {Field: "create_by", Header: "创建人"},
+		{Field: "create_time", Header: "创建时间"},
+	}},
+	{Base: "/sys/sysUserAgent", Title: "用户代理人列表", Cols: []ExcelCol{
+		{Field: "user_name", Header: "用户名"}, {Field: "agent_user_name", Header: "代理人用户名"},
+		{Field: "start_time", Header: "开始时间"}, {Field: "end_time", Header: "结束时间"},
+		{Field: "status", Header: "状态", Dic: "valid_status"},
+	}},
+	{Base: "/message/sysMessage", Title: "消息列表", Cols: []ExcelCol{
+		{Field: "es_title", Header: "消息标题"}, {Field: "es_type", Header: "消息类型", Dic: "msgType"},
+		{Field: "es_receiver", Header: "接收人"}, {Field: "es_content", Header: "消息内容"},
+		{Field: "es_send_time", Header: "发送时间"}, {Field: "es_send_status", Header: "发送状态", Dic: "send_status"},
+		{Field: "es_send_num", Header: "发送次数"}, {Field: "es_result", Header: "发送结果"},
+	}},
+	{Base: "/message/sysMessageTemplate", Title: "消息模板列表", Cols: []ExcelCol{
+		{Field: "template_name", Header: "模板名称"}, {Field: "template_code", Header: "模板编码"},
+		{Field: "template_type", Header: "模板类型", Dic: "msgType"},
+		{Field: "template_content", Header: "模板内容"},
+	}},
+	{Base: "/teaching/teachingDepartDayLog", Title: "班级日志列表", Cols: []ExcelCol{
+		{Field: "depart_name", Header: "班级名称"}, {Field: "unit_open_count", Header: "课程单元开放数"},
+		{Field: "course_work_assign_count", Header: "课程作业布置数"},
+		{Field: "additional_work_assign_count", Header: "附加作业布置数"},
+		{Field: "course_work_correct_count", Header: "课程作业批改数"},
+		{Field: "course_work_submit_count", Header: "课程作业提交数"},
+		{Field: "create_time", Header: "统计日期"},
+	}},
 }
