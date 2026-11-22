@@ -194,3 +194,13 @@ node build/probe_admin.js   # 输出 /tmp/admin_probe.json
 - `TestJavaContractCoverage`（372/372 = 100%）
 - `TestSpecsMatchSchema`（27 Excel 域）
 - `TestEmptyTableWarnings`（探针纯函数）
+
+### 6.6 收口验收（全页面实测）
+
+Puppeteer 逐页巡检 24 个管理页（含工作台/字典/权限/角色/文件/日志/通告/职务/
+编码规则/多数据源/定时任务/通讯录/我的消息/个人中心/课程包/课程单元/作业/资讯/
+素材库/布置作业/前台菜单），**全部 fails=0**（无 404、无 success:false）。
+对比第一轮：工作台 6 条失败、示例列表页 3 条失败，现已清零。
+
+结论：§1 表中 A/B/C 三类根因全部消除；D 类按 §4 的 P3 以「菜单隐藏 + 显式拒绝」
+方式处理，不再产生用户可见的 404。
